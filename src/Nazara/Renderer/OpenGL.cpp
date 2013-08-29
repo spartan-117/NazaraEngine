@@ -7,6 +7,7 @@
 #include <Nazara/Core/Log.hpp>
 #include <Nazara/Math/Basic.hpp>
 #include <Nazara/Renderer/Context.hpp>
+#include <Nazara/Renderer/RenderTarget.hpp>
 #include <cstring>
 #include <set>
 #include <sstream>
@@ -66,15 +67,20 @@ namespace
 		GLuint buffersBinding[nzBufferType_Max+1] = {0};
 		GLuint currentProgram = 0;
 		GLuint texturesBinding[32] = {0}; // 32 est pour l'instant la plus haute limite (GL_TEXTURE31)
+		NzRecti currentScissorBox = NzRecti(0,0,0,0);
+		NzRecti currentViewport = NzRecti(0,0,0,0);
 		NzRenderStates renderStates; // Toujours synchronisé avec OpenGL
+		const NzRenderTarget* currentTarget = nullptr;
+		bool scissorBoxUpdated = true;
+		bool viewportUpdated = true;
 		unsigned int textureUnit = 0;
 	};
 
 	std::set<NzString> s_openGLextensionSet;
-	std::unordered_map<NzContext*, ContextStates> s_contexts;
+	std::unordered_map<const NzContext*, ContextStates> s_contexts;
 	thread_local ContextStates* s_contextStates = nullptr;
-	const char* s_rendererName = nullptr;
-	const char* s_vendorName = nullptr;
+	NzString s_rendererName;
+	NzString s_vendorName;
 	bool s_initialized = false;
 	bool s_openGLextensions[nzOpenGLExtension_Max+1] = {false};
 	unsigned int s_glslVersion = 0;
@@ -313,6 +319,45 @@ void NzOpenGL::BindProgram(GLuint id)
 	}
 }
 
+void NzOpenGL::BindScissorBox(const NzRecti& scissorBox)
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return;
+	}
+	#endif
+
+	#if NAZARA_RENDERER_SAFE
+	if (scissorBox.width < 0)
+	{
+		NazaraError("Scissor box width must be positive");
+		return;
+	}
+
+	if (scissorBox.height < 0)
+	{
+		NazaraError("Scissor box height must be positive");
+		return;
+	}
+	#endif
+
+	if (s_contextStates->currentScissorBox != scissorBox)
+	{
+		if (s_contextStates->currentTarget)
+		{
+			unsigned int height = s_contextStates->currentTarget->GetHeight();
+			glScissor(scissorBox.x, height - scissorBox.height - scissorBox.y, scissorBox.width, scissorBox.height);
+			s_contextStates->scissorBoxUpdated = true;
+		}
+		else
+			s_contextStates->scissorBoxUpdated = false; // Sinon on attend d'avoir un target
+
+		s_contextStates->currentScissorBox = scissorBox;
+	}
+}
+
 void NzOpenGL::BindTexture(nzImageType type, GLuint id)
 {
 	#ifdef NAZARA_DEBUG
@@ -342,10 +387,66 @@ void NzOpenGL::BindTexture(unsigned int textureUnit, nzImageType type, GLuint id
 
 	if (s_contextStates->texturesBinding[textureUnit] != id)
 	{
-		SetTextureUnit(textureUnit);
+		BindTextureUnit(textureUnit);
 
 		glBindTexture(TextureTarget[type], id);
 		s_contextStates->texturesBinding[textureUnit] = id;
+	}
+}
+
+void NzOpenGL::BindTextureUnit(unsigned int textureUnit)
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return;
+	}
+	#endif
+
+	if (s_contextStates->textureUnit != textureUnit)
+	{
+		glActiveTexture(GL_TEXTURE0 + textureUnit);
+		s_contextStates->textureUnit = textureUnit;
+	}
+}
+
+void NzOpenGL::BindViewport(const NzRecti& viewport)
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return;
+	}
+	#endif
+
+	#if NAZARA_RENDERER_SAFE
+	if (viewport.width < 0)
+	{
+		NazaraError("Viewport width must be positive");
+		return;
+	}
+
+	if (viewport.height < 0)
+	{
+		NazaraError("Viewport height must be positive");
+		return;
+	}
+	#endif
+
+	if (s_contextStates->currentViewport != viewport)
+	{
+		if (s_contextStates->currentTarget)
+		{
+			unsigned int height = s_contextStates->currentTarget->GetHeight();
+			glViewport(viewport.x, height - viewport.height - viewport.y, viewport.width, viewport.height);
+			s_contextStates->viewportUpdated = true;
+		}
+		else
+			s_contextStates->viewportUpdated = false; // Sinon on attend d'avoir un target
+
+		s_contextStates->currentViewport = viewport;
 	}
 }
 
@@ -424,6 +525,84 @@ GLuint NzOpenGL::GetCurrentProgram()
 	return s_contextStates->currentProgram;
 }
 
+NzRecti NzOpenGL::GetCurrentScissorBox()
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return NzRecti();
+	}
+	#endif
+
+	return s_contextStates->currentScissorBox;
+}
+
+const NzRenderTarget* NzOpenGL::GetCurrentTarget()
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return nullptr;
+	}
+	#endif
+
+	return s_contextStates->currentTarget;
+}
+
+GLuint NzOpenGL::GetCurrentTexture()
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return 0;
+	}
+	#endif
+
+	return s_contextStates->texturesBinding[s_contextStates->textureUnit];
+}
+
+GLuint NzOpenGL::GetCurrentTexture(unsigned int textureUnit)
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return 0;
+	}
+	#endif
+
+	return s_contextStates->texturesBinding[textureUnit];
+}
+
+unsigned int NzOpenGL::GetCurrentTextureUnit()
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return 0;
+	}
+	#endif
+
+	return s_contextStates->textureUnit;
+}
+
+NzRecti NzOpenGL::GetCurrentViewport()
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return NzRecti();
+	}
+	#endif
+
+	return s_contextStates->currentViewport;
+}
+
 NzOpenGLFunc NzOpenGL::GetEntry(const NzString& entryPoint)
 {
 	return LoadEntry(entryPoint.GetConstBuffer(), false);
@@ -437,19 +616,6 @@ unsigned int NzOpenGL::GetGLSLVersion()
 NzString NzOpenGL::GetRendererName()
 {
 	return s_rendererName;
-}
-
-unsigned int NzOpenGL::GetTextureUnit()
-{
-	#ifdef NAZARA_DEBUG
-	if (!s_contextStates)
-	{
-		NazaraError("No context activated");
-		return 0;
-	}
-	#endif
-
-	return s_contextStates->textureUnit;
 }
 
 NzString NzOpenGL::GetVendorName()
@@ -1013,6 +1179,10 @@ bool NzOpenGL::Initialize()
 
 	/****************************************Initialisation****************************************/
 
+	s_contextStates = nullptr;
+	s_rendererName = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
+	s_vendorName = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
+
 	///FIXME: Utiliser le contexte de chargement comme référence ? (Vérifier mode debug)
 	if (!NzContext::Initialize())
 	{
@@ -1022,9 +1192,7 @@ bool NzOpenGL::Initialize()
 		return false;
 	}
 
-	s_rendererName = reinterpret_cast<const char*>(glGetString(GL_RENDERER));
-	s_contextStates = nullptr;
-	s_vendorName = reinterpret_cast<const char*>(glGetString(GL_VENDOR));
+	// Le contexte OpenGL n'est plus assuré à partir d'ici
 
 	return true;
 }
@@ -1044,13 +1212,130 @@ bool NzOpenGL::IsSupported(const NzString& string)
 	return s_openGLextensionSet.find(string) != s_openGLextensionSet.end();
 }
 
+void NzOpenGL::SetBuffer(nzBufferType type, GLuint id)
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return;
+	}
+	#endif
+
+	s_contextStates->buffersBinding[type] = id;
+}
+
+void NzOpenGL::SetScissorBox(const NzRecti& scissorBox)
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return;
+	}
+	#endif
+
+	s_contextStates->currentScissorBox = scissorBox;
+}
+
+void NzOpenGL::SetProgram(GLuint id)
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return;
+	}
+	#endif
+
+	s_contextStates->currentProgram = id;
+}
+
+void NzOpenGL::SetTarget(const NzRenderTarget* renderTarget)
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return;
+	}
+	#endif
+
+	s_contextStates->currentTarget = renderTarget;
+	if (renderTarget)
+	{
+		if (!s_contextStates->scissorBoxUpdated)
+		{
+			const NzRecti& scissorBox = s_contextStates->currentViewport;
+
+			unsigned int height = s_contextStates->currentTarget->GetHeight();
+			glScissor(scissorBox.x, height - scissorBox.height - scissorBox.y, scissorBox.width, scissorBox.height);
+
+			s_contextStates->scissorBoxUpdated = true;
+		}
+
+		if (!s_contextStates->viewportUpdated)
+		{
+			const NzRecti& viewport = s_contextStates->currentViewport;
+
+			unsigned int height = s_contextStates->currentTarget->GetHeight();
+			glViewport(viewport.x, height - viewport.height - viewport.y, viewport.width, viewport.height);
+
+			s_contextStates->viewportUpdated = true;
+		}
+	}
+}
+
+void NzOpenGL::SetTexture(GLuint id)
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return;
+	}
+	#endif
+
+	s_contextStates->texturesBinding[s_contextStates->textureUnit] = id;
+}
+
+void NzOpenGL::SetTexture(unsigned int textureUnit, GLuint id)
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return;
+	}
+	#endif
+
+	s_contextStates->texturesBinding[textureUnit] = id;
+}
+
 void NzOpenGL::SetTextureUnit(unsigned int textureUnit)
 {
-	if (s_contextStates->textureUnit != textureUnit)
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
 	{
-		glActiveTexture(GL_TEXTURE0 + textureUnit);
-		s_contextStates->textureUnit = textureUnit;
+		NazaraError("No context activated");
+		return;
 	}
+	#endif
+
+	s_contextStates->textureUnit = textureUnit;
+}
+
+void NzOpenGL::SetViewport(const NzRecti& viewport)
+{
+	#ifdef NAZARA_DEBUG
+	if (!s_contextStates)
+	{
+		NazaraError("No context activated");
+		return;
+	}
+	#endif
+
+	s_contextStates->currentViewport = viewport;
 }
 
 bool NzOpenGL::TranslateFormat(nzPixelFormat pixelFormat, Format* format, FormatType type)
@@ -1103,6 +1388,30 @@ bool NzOpenGL::TranslateFormat(nzPixelFormat pixelFormat, Format* format, Format
 			format->internalFormat = GL_RGB8;
 			return true;
 
+		case nzPixelFormat_RGB16F:
+			format->dataFormat = GL_RGB;
+			format->dataType = GL_FLOAT;
+			format->internalFormat = GL_RGB16F;
+			return true;
+
+		case nzPixelFormat_RGB16I:
+			format->dataFormat = GL_RGB;
+			format->dataType = GL_INT;
+			format->internalFormat = GL_RGB16I;
+			return true;
+
+		case nzPixelFormat_RGB32F:
+			format->dataFormat = GL_RGB;
+			format->dataType = GL_FLOAT;
+			format->internalFormat = GL_RGB32F;
+			return true;
+
+		case nzPixelFormat_RGB32I:
+			format->dataFormat = GL_RGB;
+			format->dataType = GL_INT;
+			format->internalFormat = GL_RGB32I;
+			return true;
+
 		case nzPixelFormat_RGBA4:
 			format->dataFormat = GL_RGBA;
 			format->dataType = GL_UNSIGNED_SHORT_4_4_4_4;
@@ -1113,6 +1422,30 @@ bool NzOpenGL::TranslateFormat(nzPixelFormat pixelFormat, Format* format, Format
 			format->dataFormat = GL_RGBA;
 			format->dataType = GL_UNSIGNED_BYTE;
 			format->internalFormat = GL_RGBA8;
+			return true;
+
+		case nzPixelFormat_RGBA16F:
+			format->dataFormat = GL_RGBA;
+			format->dataType = GL_FLOAT;
+			format->internalFormat = GL_RGBA16F;
+			return true;
+
+		case nzPixelFormat_RGBA16I:
+			format->dataFormat = GL_RGBA;
+			format->dataType = GL_INT;
+			format->internalFormat = GL_RGBA32I;
+			return true;
+
+		case nzPixelFormat_RGBA32F:
+			format->dataFormat = GL_RGBA;
+			format->dataType = GL_FLOAT;
+			format->internalFormat = GL_RGBA32F;
+			return true;
+
+		case nzPixelFormat_RGBA32I:
+			format->dataFormat = GL_RGB;
+			format->dataType = GL_INT;
+			format->internalFormat = GL_RGB32I;
 			return true;
 
 		case nzPixelFormat_Depth16:
@@ -1195,28 +1528,29 @@ void NzOpenGL::Uninitialize()
 {
 	if (s_initialized)
 	{
+		s_initialized = false;
+
 		NzContext::Uninitialize();
 
 		for (bool& ext : s_openGLextensions)
 			ext = false;
 
 		s_glslVersion = 0;
-		s_initialized = false;
 		s_openGLextensionSet.clear();
 		s_openglVersion = 0;
-		s_rendererName = nullptr;
-		s_vendorName = nullptr;
+		s_rendererName.Clear(false);
+		s_vendorName.Clear(false);
 
 		UnloadLibrary();
 	}
 }
 
-void NzOpenGL::OnContextDestruction(NzContext* context)
+void NzOpenGL::OnContextDestruction(const NzContext* context)
 {
 	s_contexts.erase(context);
 }
 
-void NzOpenGL::OnContextChange(NzContext* newContext)
+void NzOpenGL::OnContextChange(const NzContext* newContext)
 {
 	s_contextStates = (newContext) ? &s_contexts[newContext] : nullptr;
 }

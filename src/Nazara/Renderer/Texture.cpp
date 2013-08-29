@@ -164,6 +164,7 @@ NzTexture::NzTexture(const NzImage& image)
 NzTexture::~NzTexture()
 {
 	Destroy();
+	NzRenderer::OnTextureReleased(this);
 }
 
 bool NzTexture::Create(nzImageType type, nzPixelFormat format, unsigned int width, unsigned int height, unsigned int depth, nzUInt8 levelCount)
@@ -448,6 +449,19 @@ unsigned int NzTexture::GetHeight() const
 	#endif
 
 	return m_impl->height;
+}
+
+NzVector2ui NzTexture::GetSize() const
+{
+	#if NAZARA_RENDERER_SAFE
+	if (!m_impl)
+	{
+		NazaraError("Texture must be valid");
+		return 0;
+	}
+	#endif
+
+	return NzVector2ui(m_impl->width, m_impl->height);
 }
 
 nzImageType NzTexture::GetType() const
@@ -1291,6 +1305,17 @@ bool NzTexture::IsFormatSupported(nzPixelFormat format)
 		case nzPixelFormat_RGB5A1:
 		case nzPixelFormat_RGBA4:
 			return true;
+
+		// Formats supportés depuis OpenGL 3
+		case nzPixelFormat_RGB16F:
+		case nzPixelFormat_RGB16I:
+		case nzPixelFormat_RGB32F:
+		case nzPixelFormat_RGB32I:
+		case nzPixelFormat_RGBA16F:
+		case nzPixelFormat_RGBA16I:
+		case nzPixelFormat_RGBA32F:
+		case nzPixelFormat_RGBA32I:
+			return NzOpenGL::GetVersion() >= 300;
 
 		// Formats de profondeur (Supportés avec les FBOs)
 		case nzPixelFormat_Depth16:

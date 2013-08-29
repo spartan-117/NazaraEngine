@@ -31,6 +31,18 @@ nzSceneNodeType NzSceneRoot::GetSceneNodeType() const
 	return nzSceneNodeType_Root;
 }
 
+bool NzSceneRoot::IsDrawable() const
+{
+	return true;
+}
+
+bool NzSceneRoot::FrustumCull(const NzFrustumf& frustum)
+{
+	NazaraUnused(frustum);
+
+	return true; // Toujours visible
+}
+
 void NzSceneRoot::Register()
 {
 	NazaraInternalError("SceneNode::Register() called on SceneRoot");
@@ -39,11 +51,4 @@ void NzSceneRoot::Register()
 void NzSceneRoot::Unregister()
 {
 	NazaraInternalError("SceneNode::Unregister() called on SceneRoot");
-}
-
-bool NzSceneRoot::VisibilityTest(const NzCamera* camera)
-{
-	NazaraUnused(camera);
-
-	return true; // Toujours visible
 }

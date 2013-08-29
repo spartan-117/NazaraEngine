@@ -9,7 +9,7 @@
 #include <Nazara/Graphics/Debug.hpp>
 
 NzCamera::NzCamera() :
-m_viewport(0.f, 0.f, 1.f, 1.f),
+m_targetRegion(0.f, 0.f, 1.f, 1.f),
 m_target(nullptr),
 m_frustumUpdated(false),
 m_projectionMatrixUpdated(false),
@@ -26,26 +26,6 @@ NzCamera::~NzCamera()
 {
 	if (m_target)
 		m_target->RemoveListener(this);
-}
-
-void NzCamera::Activate()
-{
-	#ifdef NAZARA_GRAPHICS_SAFE
-	if (!m_target)
-	{
-		NazaraError("Camera has no render target");
-		return;
-	}
-	#endif
-
-	if (!m_viewportUpdated)
-		UpdateViewport();
-
-	NzRenderer::SetTarget(m_target);
-	NzRenderer::SetViewport(m_viewport);
-
-	if (m_scene)
-		m_scene->SetActiveCamera(this);
 }
 
 void NzCamera::EnsureFrustumUpdate() const
@@ -66,16 +46,25 @@ void NzCamera::EnsureViewMatrixUpdate() const
 		UpdateViewMatrix();
 }
 
+void NzCamera::EnsureViewportUpdate() const
+{
+	if (!m_viewportUpdated)
+		UpdateViewport();
+}
+
 float NzCamera::GetAspectRatio() const
 {
 	return m_aspectRatio;
 }
 
-const NzBoundingVolumef& NzCamera::GetBoundingVolume() const
+NzVector3f NzCamera::GetEyePosition() const
 {
-	///TODO: Remplacer par le bounding volume du Frustum ?
-	static NzBoundingVolumef dummy(nzExtend_Null);
-	return dummy;
+	return GetPosition(nzCoordSys_Global);
+}
+
+NzVector3f NzCamera::GetForward() const
+{
+	return NzNode::GetForward();
 }
 
 float NzCamera::GetFOV() const
@@ -99,11 +88,6 @@ const NzMatrix4f& NzCamera::GetProjectionMatrix() const
 	return m_projectionMatrix;
 }
 
-nzSceneNodeType NzCamera::GetSceneNodeType() const
-{
-	return nzSceneNodeType_Camera;
-}
-
 const NzRenderTarget* NzCamera::GetTarget() const
 {
 	return m_target;
@@ -122,7 +106,7 @@ const NzMatrix4f& NzCamera::GetViewMatrix() const
 	return m_viewMatrix;
 }
 
-const NzRectui& NzCamera::GetViewport() const
+const NzRecti& NzCamera::GetViewport() const
 {
 	#if NAZARA_GRAPHICS_SAFE
 	if (!m_target)
@@ -174,10 +158,13 @@ void NzCamera::SetTarget(const NzRenderTarget& renderTarget)
 void NzCamera::SetTargetRegion(const NzRectf& region)
 {
 	m_targetRegion = region;
+
+	m_frustumUpdated = false;
+	m_projectionMatrixUpdated = false;
 	m_viewportUpdated = false;
 }
 
-void NzCamera::SetViewport(const NzRectui& viewport)
+void NzCamera::SetViewport(const NzRecti& viewport)
 {
 	#if NAZARA_GRAPHICS_SAFE
 	if (!m_target)
@@ -210,16 +197,34 @@ void NzCamera::SetZNear(float zNear)
 	m_projectionMatrixUpdated = false;
 }
 
-void NzCamera::AddToRenderQueue(NzAbstractRenderQueue* renderQueue) const
+void NzCamera::ApplyView() const
 {
-	NazaraUnused(renderQueue);
+	#if NAZARA_GRAPHICS_SAFE
+	if (!m_target)
+	{
+		NazaraError("Camera has no render target");
+		return;
+	}
+	#endif
 
-	NazaraInternalError("SceneNode::AddToRenderQueue() called on Camera");
+	if (!m_projectionMatrixUpdated)
+		UpdateProjectionMatrix();
+
+	if (!m_viewMatrixUpdated)
+		UpdateViewMatrix();
+
+	if (!m_viewportUpdated)
+		UpdateViewport();
+
+	NzRenderer::SetMatrix(nzMatrixType_Projection, m_projectionMatrix);
+	NzRenderer::SetMatrix(nzMatrixType_View, m_viewMatrix);
+	NzRenderer::SetTarget(m_target);
+	NzRenderer::SetViewport(m_viewport);
 }
 
 void NzCamera::Invalidate()
 {
-	NzSceneNode::Invalidate();
+	NzNode::Invalidate();
 
 	// Le frustum et la view matrix dépendent des paramètres du node, invalidons-les
 	m_frustumUpdated = false;
@@ -241,19 +246,18 @@ bool NzCamera::OnRenderTargetSizeChange(const NzRenderTarget* renderTarget, void
 	NazaraUnused(userdata);
 
 	if (renderTarget == m_target)
+	{
+		m_frustumUpdated = false;
+		m_projectionMatrixUpdated = false;
 		m_viewportUpdated = false;
+
+		return true;
+	}
 	else
+	{
 		NazaraInternalError("Not listening to " + NzString::Pointer(renderTarget));
-
-	return true;
-}
-
-void NzCamera::Register()
-{
-}
-
-void NzCamera::Unregister()
-{
+		return false;
+	}
 }
 
 void NzCamera::UpdateFrustum() const
@@ -270,6 +274,9 @@ void NzCamera::UpdateFrustum() const
 
 void NzCamera::UpdateProjectionMatrix() const
 {
+	if (!m_viewportUpdated)
+		UpdateViewport(); // Peut affecter l'aspect ratio
+
 	m_projectionMatrix.MakePerspective(m_fov, m_aspectRatio, m_zNear, m_zFar);
 	m_projectionMatrixUpdated = true;
 }
@@ -288,8 +295,8 @@ void NzCamera::UpdateViewport() const
 	unsigned int width = m_target->GetWidth();
 	unsigned int height = std::max(m_target->GetHeight(), 1U);
 
-	float vWidth = width * m_viewport.width;
-	float vHeight = height * m_viewport.height;
+	float vWidth = width * m_targetRegion.width;
+	float vHeight = height * m_targetRegion.height;
 	float aspectRatio = vWidth/vHeight;
 
 	if (!NzNumberEquals(m_aspectRatio, aspectRatio, 0.001f))
@@ -304,11 +311,4 @@ void NzCamera::UpdateViewport() const
 	m_viewport.width = vWidth;
 	m_viewport.height = vHeight;
 	m_viewportUpdated = true;
-}
-
-bool NzCamera::VisibilityTest(const NzCamera* camera)
-{
-	NazaraUnused(camera);
-	//NazaraInternalError("SceneNode::IsVisible() called on Camera");
-	return false;
 }

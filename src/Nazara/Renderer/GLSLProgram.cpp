@@ -605,8 +605,14 @@ bool NzGLSLProgram::PostLinkage()
 		// Pour éviter de se tromper entre le nom et la constante
 		#define CacheUniform(name) m_uniformLocations[nzShaderUniform_##name] = GetUniformLocation(#name)
 
-		CacheUniform(CameraPosition);
+		CacheUniform(EyePosition);
+		CacheUniform(InvProjMatrix);
 		CacheUniform(InvTargetSize);
+		CacheUniform(InvViewMatrix);
+		CacheUniform(InvViewProjMatrix);
+		CacheUniform(InvWorldMatrix);
+		CacheUniform(InvWorldViewMatrix);
+		CacheUniform(InvWorldViewProjMatrix);
 		CacheUniform(MaterialAlphaMap);
 		CacheUniform(MaterialAlphaThreshold);
 		CacheUniform(MaterialAmbient);

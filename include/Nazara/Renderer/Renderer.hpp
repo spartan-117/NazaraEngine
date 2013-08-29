@@ -23,15 +23,19 @@ class NzIndexBuffer;
 class NzMaterial;
 class NzRenderTarget;
 class NzShaderProgram;
+class NzTexture;
 class NzVertexBuffer;
 
 class NAZARA_API NzRenderer
 {
+	friend NzShaderProgram;
+	friend NzTexture;
+
 	public:
 		NzRenderer() = delete;
 		~NzRenderer() = delete;
 
-		static void Clear(unsigned long flags = nzRendererClear_Color | nzRendererClear_Depth);
+		static void Clear(nzUInt32 flags = nzRendererClear_Color | nzRendererClear_Depth);
 
 		static void DrawFullscreenQuad();
 		static void DrawIndexedPrimitives(nzPrimitiveMode mode, unsigned int firstIndex, unsigned int indexCount);
@@ -40,7 +44,6 @@ class NAZARA_API NzRenderer
 		static void DrawPrimitivesInstanced(unsigned int instanceCount, nzPrimitiveMode mode, unsigned int firstVertex, unsigned int vertexCount);
 
 		static void Enable(nzRendererParameter parameter, bool enable);
-
 
 		static void Flush();
 
@@ -53,10 +56,10 @@ class NAZARA_API NzRenderer
 		static unsigned int GetMaxVertexAttribs();
 		static float GetPointSize();
 		static const NzRenderStates& GetRenderStates();
-		static NzRectui GetScissorRect();
+		static NzRecti GetScissorRect();
 		static const NzShaderProgram* GetShaderProgram();
 		static const NzRenderTarget* GetTarget();
-		static NzRectui GetViewport();
+		static NzRecti GetViewport();
 
 		static bool HasCapability(nzRendererCap capability);
 
@@ -78,7 +81,7 @@ class NAZARA_API NzRenderer
 		static void SetMatrix(nzMatrixType type, const NzMatrix4f& matrix);
 		static void SetPointSize(float size);
 		static void SetRenderStates(const NzRenderStates& states);
-		static void SetScissorRect(const NzRectui& viewport);
+		static void SetScissorRect(const NzRecti& rect);
 		static void SetShaderProgram(const NzShaderProgram* shader);
 		static void SetStencilCompareFunction(nzRendererComparison compareFunc);
 		static void SetStencilFailOperation(nzStencilOperation failOperation);
@@ -90,13 +93,15 @@ class NAZARA_API NzRenderer
 		static void SetTexture(nzUInt8 unit, const NzTexture* texture);
 		static void SetTextureSampler(nzUInt8 textureUnit, const NzTextureSampler& sampler);
 		static void SetVertexBuffer(const NzVertexBuffer* vertexBuffer);
-		static void SetViewport(const NzRectui& viewport);
+		static void SetViewport(const NzRecti& viewport);
 
 		static void Uninitialize();
 
 	private:
 		static void EnableInstancing(bool instancing);
 		static bool EnsureStateUpdate();
+		static void OnProgramReleased(const NzShaderProgram* program);
+		static void OnTextureReleased(const NzTexture* texture);
 		static void UpdateMatrix(nzMatrixType type);
 
 		static unsigned int s_moduleReferenceCounter;

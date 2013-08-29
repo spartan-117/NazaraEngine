@@ -59,7 +59,7 @@ bool NzRenderWindow::CopyToImage(NzImage* image) const
 	}
 	#endif
 
-	NzContext* currentContext = NzContext::GetCurrent();
+	const NzContext* currentContext = NzContext::GetCurrent();
 	if (m_context != currentContext)
 	{
 		if (!m_context->SetActive(true))
@@ -112,7 +112,7 @@ bool NzRenderWindow::CopyToTexture(NzTexture* texture) const
 	}
 	#endif
 
-	NzContext* currentContext = NzContext::GetCurrent();
+	const NzContext* currentContext = NzContext::GetCurrent();
 	if (m_context != currentContext)
 	{
 		if (!m_context->SetActive(true))
@@ -289,10 +289,17 @@ bool NzRenderWindow::OnWindowCreated()
         return false;
     }
 
-    EnableVerticalSync(false);
-
 	if (!SetActive(true)) // Les fenêtres s'activent à la création
 		NazaraWarning("Failed to activate window");
+
+    EnableVerticalSync(false);
+
+	NzVector2ui size = GetSize();
+
+	// Le scissorBox/viewport (à la création) est de la taille de la fenêtre
+	// https://www.opengl.org/sdk/docs/man/xhtml/glGet.xml
+	NzOpenGL::SetScissorBox(NzRecti(0, 0, size.x, size.y));
+	NzOpenGL::SetViewport(NzRecti(0, 0, size.x, size.y));
 
 	NotifyParametersChange();
 	NotifySizeChange();
@@ -310,3 +317,9 @@ void NzRenderWindow::OnWindowDestroy()
 		m_context = nullptr;
 	}
 }
+
+void NzRenderWindow::OnWindowResized()
+{
+	NotifySizeChange();
+}
+

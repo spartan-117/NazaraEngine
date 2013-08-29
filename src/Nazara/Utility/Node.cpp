@@ -42,10 +42,9 @@ m_transformMatrixUpdated(false)
 NzNode::~NzNode()
 {
 	for (NzNode* child : m_childs)
-		child->m_parent = nullptr;
+		child->SetParent(nullptr);
 
-	if (m_parent)
-		m_parent->RemoveChild(this);
+	SetParent(nullptr);
 }
 
 void NzNode::EnsureDerivedUpdate() const
@@ -683,7 +682,7 @@ void NzNode::UpdateDerived() const
 
 		if (m_inheritRotation)
 		{
-			m_derivedRotation = m_initialRotation * m_parent->m_derivedRotation * m_rotation;
+			m_derivedRotation = m_parent->m_derivedRotation * m_initialRotation * m_rotation;
 			m_derivedRotation.Normalize();
 		}
 		else
