@@ -21,10 +21,11 @@ class NAZARA_API NzForwardRenderTechnique : public NzAbstractRenderTechnique
 		~NzForwardRenderTechnique();
 
 		void Clear(const NzScene* scene);
-		void Draw(const NzScene* scene);
+		bool Draw(const NzScene* scene);
 
 		unsigned int GetMaxLightsPerObject() const;
 		NzAbstractRenderQueue* GetRenderQueue() override;
+		nzRenderTechniqueType GetType() const override;
 
 		void SetMaxLightsPerObject(unsigned int lightCount);
 
@@ -35,7 +36,7 @@ class NAZARA_API NzForwardRenderTechnique : public NzAbstractRenderTechnique
 
 		NzForwardRenderQueue m_renderQueue;
 		NzIndexBufferRef m_indexBuffer;
-		NzLightManager m_directionnalLights;
+		NzLightManager m_directionalLights;
 		NzLightManager m_lights;
 		NzVertexBuffer m_spriteBuffer;
 		unsigned int m_maxLightsPerObject;

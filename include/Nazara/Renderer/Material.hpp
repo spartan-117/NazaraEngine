@@ -46,7 +46,7 @@ class NAZARA_API NzMaterial : public NzResource
 		NzMaterial();
 		NzMaterial(const NzMaterial& material);
 		NzMaterial(NzMaterial&& material);
-		~NzMaterial() = default;
+		~NzMaterial();
 
 		void Apply(const NzShaderProgram* program) const;
 
@@ -64,7 +64,7 @@ class NAZARA_API NzMaterial : public NzResource
 		const NzTextureSampler& GetDiffuseSampler() const;
 		nzBlendFunc GetDstBlend() const;
 		NzTexture* GetEmissiveMap() const;
-		nzFaceCulling GetFaceCulling() const;
+		nzFaceSide GetFaceCulling() const;
 		nzFaceFilling GetFaceFilling() const;
 		NzTexture* GetHeightMap() const;
 		NzTexture* GetNormalMap() const;
@@ -107,7 +107,7 @@ class NAZARA_API NzMaterial : public NzResource
 		void SetDstBlend(nzBlendFunc func);
 		bool SetEmissiveMap(const NzString& texturePath);
 		void SetEmissiveMap(NzTexture* map);
-		void SetFaceCulling(nzFaceCulling culling);
+		void SetFaceCulling(nzFaceSide faceSide);
 		void SetFaceFilling(nzFaceFilling filling);
 		bool SetHeightMap(const NzString& texturePath);
 		void SetHeightMap(NzTexture* map);

@@ -10,7 +10,7 @@
 
 namespace
 {
-	unsigned int attributeSize[nzAttributeType_Max+1] =
+	unsigned int attributeSize[] =
 	{
 		4, // nzAttributeType_Color
 		1, // nzAttributeType_Double1
@@ -25,7 +25,7 @@ namespace
 
 	static_assert(sizeof(attributeSize)/sizeof(unsigned int) == nzAttributeType_Max+1, "Attribute size array is incomplete");
 
-	unsigned int attributeStride[nzAttributeType_Max+1] =
+	unsigned int attributeStride[] =
 	{
 		4*sizeof(nzUInt8), // nzAttributeType_Color
 		1*sizeof(double),  // nzAttributeType_Double1
@@ -51,6 +51,11 @@ NzResource(),
 m_stride(declaration.m_stride)
 {
 	std::memcpy(m_attributes, declaration.m_attributes, sizeof(Attribute)*(nzAttributeUsage_Max+1));
+}
+
+NzVertexDeclaration::~NzVertexDeclaration()
+{
+	NotifyDestroy();
 }
 
 void NzVertexDeclaration::DisableAttribute(nzAttributeUsage usage)

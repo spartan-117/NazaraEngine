@@ -17,7 +17,6 @@ struct NzTextureImpl
 	nzImageType type;
 	nzPixelFormat format;
 	nzUInt8 levelCount;
-	NzRenderTexture* renderTexture = nullptr;
 	bool mipmapping = false;
 	bool mipmapsUpdated = true;
 	unsigned int depth;
@@ -399,6 +398,16 @@ bool NzTexture::EnableMipmapping(bool enable)
 	return true;
 }
 
+void NzTexture::EnsureMipmapsUpdate() const
+{
+	if (m_impl->mipmapping && !m_impl->mipmapsUpdated)
+	{
+		NzOpenGL::BindTexture(m_impl->type, m_impl->id);
+		glGenerateMipmap(NzOpenGL::TextureTarget[m_impl->type]);
+		m_impl->mipmapsUpdated = true;
+	}
+}
+
 nzUInt8 NzTexture::GetBytesPerPixel() const
 {
 	#if NAZARA_RENDERER_SAFE
@@ -527,19 +536,6 @@ bool NzTexture::IsCubemap() const
 	#endif
 
 	return m_impl->type == nzImageType_Cubemap;
-}
-
-bool NzTexture::IsTarget() const
-{
-	#if NAZARA_RENDERER_SAFE
-	if (!m_impl)
-	{
-		NazaraError("Texture must be valid");
-		return false;
-	}
-	#endif
-
-	return m_impl->renderTexture != nullptr;
 }
 
 bool NzTexture::IsValid() const
@@ -974,7 +970,7 @@ bool NzTexture::Update(const NzImage& image, const NzBoxui& box, nzUInt8 level)
 	}
 	#endif
 
-	const nzUInt8* pixels = image.GetConstPixels(box.x, box.y, box.z, level);
+	const nzUInt8* pixels = image.GetConstPixels(0, 0, 0, level);
 	if (!pixels)
 	{
 		NazaraError("Failed to access image's pixels");
@@ -1000,7 +996,7 @@ bool NzTexture::Update(const NzImage& image, const NzRectui& rect, unsigned int 
 	}
 	#endif
 
-	const nzUInt8* pixels = image.GetConstPixels(rect.x, rect.y, z, level);
+	const nzUInt8* pixels = image.GetConstPixels(0, 0, 0, level);
 	if (!pixels)
 	{
 		NazaraError("Failed to access image's pixels");
@@ -1029,12 +1025,6 @@ bool NzTexture::Update(const nzUInt8* pixels, const NzBoxui& box, unsigned int s
 	if (!m_impl)
 	{
 		NazaraError("Texture must be valid");
-		return false;
-	}
-
-	if (m_impl->renderTexture)
-	{
-		NazaraError("Texture is a target, it cannot be updated");
 		return false;
 	}
 
@@ -1184,12 +1174,6 @@ bool NzTexture::UpdateFace(nzCubemapFace face, const nzUInt8* pixels, const NzRe
 		return false;
 	}
 
-	if (m_impl->renderTexture)
-	{
-		NazaraError("Texture is a target, it cannot be updated");
-		return false;
-	}
-
 	if (m_impl->type != nzImageType_Cubemap)
 	{
 		NazaraError("UpdateFace is designed for cubemaps, use Update instead");
@@ -1250,19 +1234,6 @@ bool NzTexture::UpdateFace(nzCubemapFace face, const nzUInt8* pixels, const NzRe
 	return true;
 }
 
-bool NzTexture::Bind() const
-{
-	NzOpenGL::BindTexture(m_impl->type, m_impl->id);
-
-	if (m_impl->mipmapping && !m_impl->mipmapsUpdated)
-	{
-		glGenerateMipmap(NzOpenGL::TextureTarget[m_impl->type]);
-		m_impl->mipmapsUpdated = true;
-	}
-
-	return true;
-}
-
 unsigned int NzTexture::GetOpenGLID() const
 {
 	#if NAZARA_RENDERER_SAFE
@@ -1307,14 +1278,38 @@ bool NzTexture::IsFormatSupported(nzPixelFormat format)
 			return true;
 
 		// Formats supportés depuis OpenGL 3
+		case nzPixelFormat_R8:
+		case nzPixelFormat_R8I:
+		case nzPixelFormat_R8UI:
+		case nzPixelFormat_R16:
+		case nzPixelFormat_R16F:
+		case nzPixelFormat_R16I:
+		case nzPixelFormat_R16UI:
+		case nzPixelFormat_R32F:
+		case nzPixelFormat_R32I:
+		case nzPixelFormat_R32UI:
+		case nzPixelFormat_RG8:
+		case nzPixelFormat_RG8I:
+		case nzPixelFormat_RG8UI:
+		case nzPixelFormat_RG16:
+		case nzPixelFormat_RG16F:
+		case nzPixelFormat_RG16I:
+		case nzPixelFormat_RG16UI:
+		case nzPixelFormat_RG32F:
+		case nzPixelFormat_RG32I:
+		case nzPixelFormat_RG32UI:
 		case nzPixelFormat_RGB16F:
 		case nzPixelFormat_RGB16I:
+		case nzPixelFormat_RGB16UI:
 		case nzPixelFormat_RGB32F:
 		case nzPixelFormat_RGB32I:
+		case nzPixelFormat_RGB32UI:
 		case nzPixelFormat_RGBA16F:
 		case nzPixelFormat_RGBA16I:
+		case nzPixelFormat_RGBA16UI:
 		case nzPixelFormat_RGBA32F:
 		case nzPixelFormat_RGBA32I:
+		case nzPixelFormat_RGBA32UI:
 			return NzOpenGL::GetVersion() >= 300;
 
 		// Formats de profondeur (Supportés avec les FBOs)
@@ -1375,22 +1370,9 @@ bool NzTexture::IsTypeSupported(nzImageType type)
 	return false;
 }
 
-NzRenderTexture* NzTexture::GetRenderTexture() const
+void NzTexture::InvalidateMipmaps()
 {
-	#ifdef NAZARA_DEBUG
-	if (!m_impl)
-	{
-		NazaraInternalError("Texture must be valid");
-		return nullptr;
-	}
-	#endif
-
-	return m_impl->renderTexture;
-}
-
-void NzTexture::SetRenderTexture(NzRenderTexture* renderTexture)
-{
-	#ifdef NAZARA_DEBUG
+	#if NAZARA_RENDERER_SAFE
 	if (!m_impl)
 	{
 		NazaraInternalError("Texture must be valid");
@@ -1398,5 +1380,5 @@ void NzTexture::SetRenderTexture(NzRenderTexture* renderTexture)
 	}
 	#endif
 
-	m_impl->renderTexture = renderTexture;
+	m_impl->mipmapsUpdated = false;
 }

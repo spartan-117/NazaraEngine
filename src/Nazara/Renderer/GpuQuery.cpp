@@ -2,7 +2,7 @@
 // This file is part of the "Nazara Engine - Renderer module"
 // For conditions of distribution and use, see copyright notice in Config.hpp
 
-#include <Nazara/Renderer/OcclusionQuery.hpp>
+#include <Nazara/Renderer/GpuQuery.hpp>
 #include <Nazara/Core/Error.hpp>
 #include <Nazara/Renderer/Config.hpp>
 #include <Nazara/Renderer/Context.hpp>
@@ -11,7 +11,7 @@
 #include <stdexcept>
 #include <Nazara/Renderer/Debug.hpp>
 
-NzOcclusionQuery::NzOcclusionQuery() :
+NzGpuQuery::NzGpuQuery() :
 m_id(0)
 {
 	if (IsSupported())
@@ -35,7 +35,7 @@ m_id(0)
 	#endif
 }
 
-NzOcclusionQuery::~NzOcclusionQuery()
+NzGpuQuery::~NzGpuQuery()
 {
 	if (m_id)
 	{
@@ -46,7 +46,7 @@ NzOcclusionQuery::~NzOcclusionQuery()
 	}
 }
 
-void NzOcclusionQuery::Begin()
+void NzGpuQuery::Begin(nzGpuQueryMode mode)
 {
 	#ifdef NAZARA_DEBUG
 	if (NzContext::GetCurrent() == nullptr)
@@ -56,10 +56,19 @@ void NzOcclusionQuery::Begin()
 	}
 	#endif
 
-	glBeginQuery(GL_SAMPLES_PASSED, m_id);
+	#if NAZARA_RENDERER_SAFE
+	if (!IsModeSupported(mode))
+	{
+		NazaraError("Mode (0x" + NzString::Number(mode, 16) + ") not supported");
+		return;
+	}
+	#endif
+
+	m_mode = mode;
+	glBeginQuery(NzOpenGL::QueryMode[mode], m_id);
 }
 
-void NzOcclusionQuery::End()
+void NzGpuQuery::End()
 {
 	#ifdef NAZARA_DEBUG
 	if (NzContext::GetCurrent() == nullptr)
@@ -69,10 +78,10 @@ void NzOcclusionQuery::End()
 	}
 	#endif
 
-	glEndQuery(GL_SAMPLES_PASSED);
+	glEndQuery(NzOpenGL::QueryMode[m_mode]);
 }
 
-unsigned int NzOcclusionQuery::GetResult() const
+unsigned int NzGpuQuery::GetResult() const
 {
 	NzContext::EnsureContext();
 
@@ -82,7 +91,7 @@ unsigned int NzOcclusionQuery::GetResult() const
 	return result;
 }
 
-bool NzOcclusionQuery::IsResultAvailable() const
+bool NzGpuQuery::IsResultAvailable() const
 {
 	NzContext::EnsureContext();
 
@@ -92,7 +101,33 @@ bool NzOcclusionQuery::IsResultAvailable() const
 	return available == GL_TRUE;
 }
 
-bool NzOcclusionQuery::IsSupported()
+unsigned int NzGpuQuery::GetOpenGLID() const
+{
+	return m_id;
+}
+
+bool NzGpuQuery::IsModeSupported(nzGpuQueryMode mode)
+{
+	switch (mode)
+	{
+		case nzGpuQueryMode_AnySamplesPassed:
+		case nzGpuQueryMode_TimeElapsed:
+			return NzOpenGL::GetVersion() >= 330;
+
+		case nzGpuQueryMode_AnySamplesPassedConservative:
+			return NzOpenGL::GetVersion() >= 430;
+
+		case nzGpuQueryMode_PrimitiveGenerated:
+		case nzGpuQueryMode_SamplesPassed:
+		case nzGpuQueryMode_TransformFeedbackPrimitivesWritten:
+			return true;
+	}
+
+	NazaraError("Gpu Query mode not handled (0x" + NzString::Number(mode, 16) + ')');
+	return false;
+}
+
+bool NzGpuQuery::IsSupported()
 {
 	return NzRenderer::HasCapability(nzRendererCap_OcclusionQuery);
 }

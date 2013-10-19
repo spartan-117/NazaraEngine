@@ -12,6 +12,7 @@
 #include <Nazara/Math/Matrix4.hpp>
 #include <Nazara/Math/Rect.hpp>
 #include <Nazara/Renderer/Enums.hpp>
+#include <Nazara/Renderer/GpuQuery.hpp>
 #include <Nazara/Renderer/RenderStates.hpp>
 #include <Nazara/Renderer/TextureSampler.hpp>
 #include <Nazara/Utility/Enums.hpp>
@@ -35,6 +36,8 @@ class NAZARA_API NzRenderer
 		NzRenderer() = delete;
 		~NzRenderer() = delete;
 
+		static void BeginCondition(const NzGpuQuery& query, nzGpuQueryCondition condition);
+
 		static void Clear(nzUInt32 flags = nzRendererClear_Color | nzRendererClear_Depth);
 
 		static void DrawFullscreenQuad();
@@ -45,12 +48,15 @@ class NAZARA_API NzRenderer
 
 		static void Enable(nzRendererParameter parameter, bool enable);
 
+		static void EndCondition();
+
 		static void Flush();
 
 		static NzVertexBuffer* GetInstanceBuffer();
 		static float GetLineWidth();
 		static NzMatrix4f GetMatrix(nzMatrixType type);
 		static nzUInt8 GetMaxAnisotropyLevel();
+		static unsigned int GetMaxColorAttachments();
 		static unsigned int GetMaxRenderTargets();
 		static unsigned int GetMaxTextureUnits();
 		static unsigned int GetMaxVertexAttribs();
@@ -74,7 +80,7 @@ class NAZARA_API NzRenderer
 		static void SetClearDepth(double depth);
 		static void SetClearStencil(unsigned int value);
 		static void SetDepthFunc(nzRendererComparison compareFunc);
-		static void SetFaceCulling(nzFaceCulling cullingMode);
+		static void SetFaceCulling(nzFaceSide faceSide);
 		static void SetFaceFilling(nzFaceFilling fillingMode);
 		static void SetIndexBuffer(const NzIndexBuffer* indexBuffer);
 		static void SetLineWidth(float size);
@@ -83,12 +89,12 @@ class NAZARA_API NzRenderer
 		static void SetRenderStates(const NzRenderStates& states);
 		static void SetScissorRect(const NzRecti& rect);
 		static void SetShaderProgram(const NzShaderProgram* shader);
-		static void SetStencilCompareFunction(nzRendererComparison compareFunc);
-		static void SetStencilFailOperation(nzStencilOperation failOperation);
-		static void SetStencilMask(nzUInt32 mask);
-		static void SetStencilPassOperation(nzStencilOperation passOperation);
-		static void SetStencilReferenceValue(unsigned int refValue);
-		static void SetStencilZFailOperation(nzStencilOperation zfailOperation);
+		static void SetStencilCompareFunction(nzRendererComparison compareFunc, nzFaceSide faceSide = nzFaceSide_FrontAndBack);
+		static void SetStencilFailOperation(nzStencilOperation failOperation, nzFaceSide faceSide = nzFaceSide_FrontAndBack);
+		static void SetStencilMask(nzUInt32 mask, nzFaceSide faceSide = nzFaceSide_FrontAndBack);
+		static void SetStencilPassOperation(nzStencilOperation passOperation, nzFaceSide faceSide = nzFaceSide_FrontAndBack);
+		static void SetStencilReferenceValue(unsigned int refValue, nzFaceSide faceSide = nzFaceSide_FrontAndBack);
+		static void SetStencilZFailOperation(nzStencilOperation zfailOperation, nzFaceSide faceSide = nzFaceSide_FrontAndBack);
 		static bool SetTarget(const NzRenderTarget* target);
 		static void SetTexture(nzUInt8 unit, const NzTexture* texture);
 		static void SetTextureSampler(nzUInt8 textureUnit, const NzTextureSampler& sampler);

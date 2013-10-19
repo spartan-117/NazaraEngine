@@ -610,7 +610,7 @@ const nzUInt8* NzImage::GetConstPixels(unsigned int x, unsigned int y, unsigned 
 	#if NAZARA_UTILITY_SAFE
 	if (x >= width)
 	{
-		NazaraError("X value exceeds width (" + NzString::Number(x) + " >= (" + NzString::Number(width) + ')');
+		NazaraError("X value exceeds width (" + NzString::Number(x) + " >= " + NzString::Number(width) + ')');
 		return nullptr;
 	}
 	#endif
@@ -619,14 +619,14 @@ const nzUInt8* NzImage::GetConstPixels(unsigned int x, unsigned int y, unsigned 
 	#if NAZARA_UTILITY_SAFE
 	if (y >= height)
 	{
-		NazaraError("Y value exceeds height (" + NzString::Number(y) + " >= (" + NzString::Number(height) + ')');
+		NazaraError("Y value exceeds height (" + NzString::Number(y) + " >= " + NzString::Number(height) + ')');
 		return nullptr;
 	}
 
 	unsigned int depth = (m_sharedImage->type == nzImageType_Cubemap) ? 6 : GetLevelSize(m_sharedImage->depth, level);
 	if (z >= depth)
 	{
-		NazaraError("Z value exceeds depth (" + NzString::Number(z) + " >= (" + NzString::Number(depth) + ')');
+		NazaraError("Z value exceeds depth (" + NzString::Number(z) + " >= " + NzString::Number(depth) + ')');
 		return nullptr;
 	}
 	#endif
@@ -1279,9 +1279,9 @@ nzUInt8 NzImage::GetMaxLevel(unsigned int width, unsigned int height, unsigned i
 {
 	static const float invLog2 = 1.f/std::log(2.f);
 
-	unsigned int widthLevel = invLog2 * std::log(static_cast<float>(width));
-	unsigned int heightLevel = invLog2 * std::log(static_cast<float>(height));
-	unsigned int depthLevel = invLog2 * std::log(static_cast<float>(depth));
+	unsigned int widthLevel = static_cast<unsigned int>(invLog2 * std::log(static_cast<float>(width)));
+	unsigned int heightLevel = static_cast<unsigned int>(invLog2 * std::log(static_cast<float>(height)));
+	unsigned int depthLevel = static_cast<unsigned int>(invLog2 * std::log(static_cast<float>(depth)));
 
 	return std::max(std::max(std::max(widthLevel, heightLevel), depthLevel), 1U);
 }

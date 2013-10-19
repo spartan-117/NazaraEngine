@@ -177,7 +177,7 @@ void NzOpenGL::ApplyStates(const NzRenderStates& states)
 	{
 		if (currentRenderStates.faceCulling != states.faceCulling)
 		{
-			glCullFace(FaceCulling[states.faceCulling]);
+			glCullFace(FaceSide[states.faceCulling]);
 			currentRenderStates.faceCulling = states.faceCulling;
 		}
 	}
@@ -191,25 +191,32 @@ void NzOpenGL::ApplyStates(const NzRenderStates& states)
 	// Ici encore, ça ne sert à rien de se soucier des fonctions de stencil sans qu'il soit activé
 	if (states.parameters[nzRendererParameter_StencilTest])
 	{
-		if (currentRenderStates.stencilCompare != states.stencilCompare ||
-		    currentRenderStates.stencilMask != states.stencilMask ||
-		    currentRenderStates.stencilReference != states.stencilReference)
+		for (unsigned int i = 0; i < 2; ++i)
 		{
-			glStencilFunc(RendererComparison[states.stencilCompare], states.stencilReference, states.stencilMask);
-			currentRenderStates.stencilCompare = states.stencilCompare;
-			currentRenderStates.stencilMask = states.stencilMask;
-			currentRenderStates.stencilReference = states.stencilReference;
-		}
+			GLenum face = (i == 0) ? GL_BACK : GL_FRONT;
+			const NzRenderStates::Face& srcStates = (i == 0) ? states.backFace : states.frontFace;
+			NzRenderStates::Face& dstStates = (i == 0) ? currentRenderStates.backFace : currentRenderStates.frontFace;
 
-		// Ici encore, ça ne sert à rien de se soucier des fonctions de stencil sans qu'il soit activé
-		if (currentRenderStates.stencilFail != states.stencilFail ||
-		    currentRenderStates.stencilPass != states.stencilPass ||
-		    currentRenderStates.stencilZFail != states.stencilZFail)
-		{
-			glStencilOp(StencilOperation[states.stencilFail], StencilOperation[states.stencilZFail], StencilOperation[states.stencilPass]);
-			currentRenderStates.stencilFail = states.stencilFail;
-			currentRenderStates.stencilPass = states.stencilPass;
-			currentRenderStates.stencilZFail = states.stencilZFail;
+			if (dstStates.stencilCompare != srcStates.stencilCompare ||
+				dstStates.stencilMask != srcStates.stencilMask ||
+				dstStates.stencilReference != srcStates.stencilReference)
+			{
+				glStencilFuncSeparate(face, RendererComparison[srcStates.stencilCompare], srcStates.stencilReference, srcStates.stencilMask);
+				dstStates.stencilCompare = srcStates.stencilCompare;
+				dstStates.stencilMask = srcStates.stencilMask;
+				dstStates.stencilReference = srcStates.stencilReference;
+			}
+
+			// Ici encore, ça ne sert à rien de se soucier des fonctions de stencil sans qu'il soit activé
+			if (dstStates.stencilFail != srcStates.stencilFail ||
+				dstStates.stencilPass != srcStates.stencilPass ||
+				dstStates.stencilZFail != srcStates.stencilZFail)
+			{
+				glStencilOpSeparate(face, StencilOperation[srcStates.stencilFail], StencilOperation[srcStates.stencilZFail], StencilOperation[srcStates.stencilPass]);
+				dstStates.stencilFail = srcStates.stencilFail;
+				dstStates.stencilPass = srcStates.stencilPass;
+				dstStates.stencilZFail = srcStates.stencilZFail;
+			}
 		}
 	}
 
@@ -783,6 +790,7 @@ bool NzOpenGL::Initialize()
 		glBindBuffer = reinterpret_cast<PFNGLBINDBUFFERPROC>(LoadEntry("glBindBuffer"));
 		glBindTexture = reinterpret_cast<PFNGLBINDTEXTUREPROC>(LoadEntry("glBindTexture"));
 		glBlendFunc = reinterpret_cast<PFNGLBLENDFUNCPROC>(LoadEntry("glBlendFunc"));
+		glBlendFuncSeparate = reinterpret_cast<PFNGLBLENDFUNCSEPARATEPROC>(LoadEntry("glBlendFuncSeparate"));
 		glBufferData = reinterpret_cast<PFNGLBUFFERDATAPROC>(LoadEntry("glBufferData"));
 		glBufferSubData = reinterpret_cast<PFNGLBUFFERSUBDATAPROC>(LoadEntry("glBufferSubData"));
 		glClear = reinterpret_cast<PFNGLCLEARPROC>(LoadEntry("glClear"));
@@ -845,7 +853,9 @@ bool NzOpenGL::Initialize()
 		glScissor = reinterpret_cast<PFNGLSCISSORPROC>(LoadEntry("glScissor"));
 		glShaderSource = reinterpret_cast<PFNGLSHADERSOURCEPROC>(LoadEntry("glShaderSource"));
 		glStencilFunc = reinterpret_cast<PFNGLSTENCILFUNCPROC>(LoadEntry("glStencilFunc"));
+		glStencilFuncSeparate = reinterpret_cast<PFNGLSTENCILFUNCSEPARATEPROC>(LoadEntry("glStencilFuncSeparate"));
 		glStencilOp = reinterpret_cast<PFNGLSTENCILOPPROC>(LoadEntry("glStencilOp"));
+		glStencilOpSeparate = reinterpret_cast<PFNGLSTENCILOPSEPARATEPROC>(LoadEntry("glStencilOpSeparate"));
 		glTexImage2D = reinterpret_cast<PFNGLTEXIMAGE2DPROC>(LoadEntry("glTexImage2D"));
 		glTexImage3D = reinterpret_cast<PFNGLTEXIMAGE3DPROC>(LoadEntry("glTexImage3D"));
 		glTexParameterf = reinterpret_cast<PFNGLTEXPARAMETERFPROC>(LoadEntry("glTexParameterf"));
@@ -854,9 +864,14 @@ bool NzOpenGL::Initialize()
 		glTexSubImage3D = reinterpret_cast<PFNGLTEXSUBIMAGE3DPROC>(LoadEntry("glTexSubImage3D"));
 		glUniform1f = reinterpret_cast<PFNGLUNIFORM1FPROC>(LoadEntry("glUniform1f"));
 		glUniform1i = reinterpret_cast<PFNGLUNIFORM1IPROC>(LoadEntry("glUniform1i"));
+		glUniform1fv = reinterpret_cast<PFNGLUNIFORM1FVPROC>(LoadEntry("glUniform1fv"));
+		glUniform1iv = reinterpret_cast<PFNGLUNIFORM1IVPROC>(LoadEntry("glUniform1iv"));
 		glUniform2fv = reinterpret_cast<PFNGLUNIFORM2FVPROC>(LoadEntry("glUniform2fv"));
+		glUniform2iv = reinterpret_cast<PFNGLUNIFORM2IVPROC>(LoadEntry("glUniform2iv"));
 		glUniform3fv = reinterpret_cast<PFNGLUNIFORM3FVPROC>(LoadEntry("glUniform3fv"));
+		glUniform3iv = reinterpret_cast<PFNGLUNIFORM3IVPROC>(LoadEntry("glUniform3iv"));
 		glUniform4fv = reinterpret_cast<PFNGLUNIFORM4FVPROC>(LoadEntry("glUniform4fv"));
+		glUniform4iv = reinterpret_cast<PFNGLUNIFORM4IVPROC>(LoadEntry("glUniform4iv"));
 		glUniformMatrix4fv = reinterpret_cast<PFNGLUNIFORMMATRIX4FVPROC>(LoadEntry("glUniformMatrix4fv"));
 		glUnmapBuffer = reinterpret_cast<PFNGLUNMAPBUFFERPROC>(LoadEntry("glUnmapBuffer"));
 		glUseProgram = reinterpret_cast<PFNGLUSEPROGRAMPROC>(LoadEntry("glUseProgram"));
@@ -919,6 +934,37 @@ bool NzOpenGL::Initialize()
 
 	// AnisotropicFilter
 	s_openGLextensions[nzOpenGLExtension_AnisotropicFilter] = IsSupported("GL_EXT_texture_filter_anisotropic");
+
+	// ConditionalRender
+	if (s_openglVersion >= 300)
+	{
+		try
+		{
+			glBeginConditionalRender = reinterpret_cast<PFNGLBEGINCONDITIONALRENDERPROC>(LoadEntry("glBeginConditionalRender"));
+			glEndConditionalRender = reinterpret_cast<PFNGLENDCONDITIONALRENDERPROC>(LoadEntry("glEndConditionalRender"));
+
+			s_openGLextensions[nzOpenGLExtension_ConditionalRender] = true;
+		}
+		catch (const std::exception& e)
+		{
+			NazaraWarning("Failed to load Conditional Render: " + NzString(e.what()));
+		}
+	}
+
+	if (!s_openGLextensions[nzOpenGLExtension_ConditionalRender] && IsSupported("GL_NV_conditional_render"))
+	{
+		try
+		{
+			glBeginConditionalRender = reinterpret_cast<PFNGLBEGINCONDITIONALRENDERPROC>(LoadEntry("glBeginConditionalRenderNV"));
+			glEndConditionalRender = reinterpret_cast<PFNGLENDCONDITIONALRENDERPROC>(LoadEntry("glEndConditionalRenderNV"));
+
+			s_openGLextensions[nzOpenGLExtension_ConditionalRender] = true;
+		}
+		catch (const std::exception& e)
+		{
+			NazaraWarning("Failed to load GL_NV_conditional_render: " + NzString(e.what()));
+		}
+	}
 
 	// DebugOutput
 	if (s_openglVersion >= 430 || IsSupported("GL_KHR_debug"))
@@ -992,6 +1038,7 @@ bool NzOpenGL::Initialize()
 		try
 		{
 			glUniform1d = reinterpret_cast<PFNGLUNIFORM1DPROC>(LoadEntry("glUniform1d"));
+			glUniform1dv = reinterpret_cast<PFNGLUNIFORM1DVPROC>(LoadEntry("glUniform1dv"));
 			glUniform2dv = reinterpret_cast<PFNGLUNIFORM2DVPROC>(LoadEntry("glUniform2dv"));
 			glUniform3dv = reinterpret_cast<PFNGLUNIFORM3DVPROC>(LoadEntry("glUniform3dv"));
 			glUniform4dv = reinterpret_cast<PFNGLUNIFORM4DVPROC>(LoadEntry("glUniform4dv"));
@@ -1107,15 +1154,21 @@ bool NzOpenGL::Initialize()
 		{
 			glProgramUniform1f = reinterpret_cast<PFNGLPROGRAMUNIFORM1FPROC>(LoadEntry("glProgramUniform1f"));
 			glProgramUniform1i = reinterpret_cast<PFNGLPROGRAMUNIFORM1IPROC>(LoadEntry("glProgramUniform1i"));
+			glProgramUniform1fv = reinterpret_cast<PFNGLPROGRAMUNIFORM1FVPROC>(LoadEntry("glProgramUniform1fv"));
+			glProgramUniform1iv = reinterpret_cast<PFNGLPROGRAMUNIFORM1IVPROC>(LoadEntry("glProgramUniform1iv"));
 			glProgramUniform2fv = reinterpret_cast<PFNGLPROGRAMUNIFORM2FVPROC>(LoadEntry("glProgramUniform2fv"));
+			glProgramUniform2iv = reinterpret_cast<PFNGLPROGRAMUNIFORM2IVPROC>(LoadEntry("glProgramUniform2iv"));
 			glProgramUniform3fv = reinterpret_cast<PFNGLPROGRAMUNIFORM3FVPROC>(LoadEntry("glProgramUniform3fv"));
+			glProgramUniform3iv = reinterpret_cast<PFNGLPROGRAMUNIFORM3IVPROC>(LoadEntry("glProgramUniform3iv"));
 			glProgramUniform4fv = reinterpret_cast<PFNGLPROGRAMUNIFORM4FVPROC>(LoadEntry("glProgramUniform4fv"));
+			glProgramUniform4iv = reinterpret_cast<PFNGLPROGRAMUNIFORM4IVPROC>(LoadEntry("glProgramUniform4iv"));
 			glProgramUniformMatrix4fv = reinterpret_cast<PFNGLPROGRAMUNIFORMMATRIX4FVPROC>(LoadEntry("glProgramUniformMatrix4fv"));
 
 			// Si ARB_gpu_shader_fp64 est supporté, alors cette extension donne également accès aux fonctions utilisant des double
 			if (s_openGLextensions[nzOpenGLExtension_FP64])
 			{
 				glProgramUniform1d = reinterpret_cast<PFNGLPROGRAMUNIFORM1DPROC>(LoadEntry("glProgramUniform1d"));
+				glProgramUniform1dv = reinterpret_cast<PFNGLPROGRAMUNIFORM2DVPROC>(LoadEntry("glProgramUniform1dv"));
 				glProgramUniform2dv = reinterpret_cast<PFNGLPROGRAMUNIFORM2DVPROC>(LoadEntry("glProgramUniform2dv"));
 				glProgramUniform3dv = reinterpret_cast<PFNGLPROGRAMUNIFORM3DVPROC>(LoadEntry("glProgramUniform3dv"));
 				glProgramUniform4dv = reinterpret_cast<PFNGLPROGRAMUNIFORM4DVPROC>(LoadEntry("glProgramUniform4dv"));
@@ -1340,6 +1393,7 @@ void NzOpenGL::SetViewport(const NzRecti& viewport)
 
 bool NzOpenGL::TranslateFormat(nzPixelFormat pixelFormat, Format* format, FormatType type)
 {
+	///FIXME: Vérifier certains dataType
 	switch (pixelFormat)
 	{
 		case nzPixelFormat_BGR8:
@@ -1376,6 +1430,126 @@ bool NzOpenGL::TranslateFormat(nzPixelFormat pixelFormat, Format* format, Format
 		case nzPixelFormat_LA8:
 			return false;
 
+		case nzPixelFormat_R8:
+			format->dataFormat = GL_RED;
+			format->dataType = GL_UNSIGNED_BYTE;
+			format->internalFormat = GL_R8;
+			return true;
+
+		case nzPixelFormat_R8I:
+			format->dataFormat = GL_RED;
+			format->dataType = GL_BYTE;
+			format->internalFormat = GL_R8I;
+			return true;
+
+		case nzPixelFormat_R8UI:
+			format->dataFormat = GL_RED;
+			format->dataType = GL_UNSIGNED_BYTE;
+			format->internalFormat = GL_R8UI;
+			return true;
+
+		case nzPixelFormat_R16:
+			format->dataFormat = GL_RED;
+			format->dataType = GL_UNSIGNED_SHORT;
+			format->internalFormat = GL_R16;
+			return true;
+
+		case nzPixelFormat_R16F:
+			format->dataFormat = GL_RED;
+			format->dataType = GL_HALF_FLOAT; ///FIXME: Correct ?
+			format->internalFormat = GL_R16F;
+			return true;
+
+		case nzPixelFormat_R16I:
+			format->dataFormat = GL_RED;
+			format->dataType = GL_SHORT;
+			format->internalFormat = GL_R16I;
+			return true;
+
+		case nzPixelFormat_R16UI:
+			format->dataFormat = GL_RED;
+			format->dataType = GL_UNSIGNED_SHORT;
+			format->internalFormat = GL_R16UI;
+			return true;
+
+		case nzPixelFormat_R32F:
+			format->dataFormat = GL_RED;
+			format->dataType = GL_FLOAT;
+			format->internalFormat = GL_R32F;
+			return true;
+
+		case nzPixelFormat_R32I:
+			format->dataFormat = GL_RED;
+			format->dataType = GL_INT;
+			format->internalFormat = GL_R32I;
+			return true;
+
+		case nzPixelFormat_R32UI:
+			format->dataFormat = GL_RED;
+			format->dataType = GL_UNSIGNED_INT;
+			format->internalFormat = GL_R32UI;
+			return true;
+
+		case nzPixelFormat_RG8:
+			format->dataFormat = GL_RG;
+			format->dataType = GL_UNSIGNED_BYTE;
+			format->internalFormat = GL_RG8;
+			return true;
+
+		case nzPixelFormat_RG8I:
+			format->dataFormat = GL_RG;
+			format->dataType = GL_BYTE;
+			format->internalFormat = GL_RG8I;
+			return true;
+
+		case nzPixelFormat_RG8UI:
+			format->dataFormat = GL_RG;
+			format->dataType = GL_UNSIGNED_BYTE;
+			format->internalFormat = GL_RG8UI;
+			return true;
+
+		case nzPixelFormat_RG16:
+			format->dataFormat = GL_RG;
+			format->dataType = GL_UNSIGNED_SHORT;
+			format->internalFormat = GL_RG16;
+			return true;
+
+		case nzPixelFormat_RG16F:
+			format->dataFormat = GL_RG;
+			format->dataType = GL_HALF_FLOAT; ///FIXME: Correct ?
+			format->internalFormat = GL_RG16F;
+			return true;
+
+		case nzPixelFormat_RG16I:
+			format->dataFormat = GL_RG;
+			format->dataType = GL_SHORT;
+			format->internalFormat = GL_RG16I;
+			return true;
+
+		case nzPixelFormat_RG16UI:
+			format->dataFormat = GL_RG;
+			format->dataType = GL_UNSIGNED_SHORT;
+			format->internalFormat = GL_RG16UI;
+			return true;
+
+		case nzPixelFormat_RG32F:
+			format->dataFormat = GL_RG;
+			format->dataType = GL_FLOAT;
+			format->internalFormat = GL_RG32F;
+			return true;
+
+		case nzPixelFormat_RG32I:
+			format->dataFormat = GL_RG;
+			format->dataType = GL_INT;
+			format->internalFormat = GL_RG32I;
+			return true;
+
+		case nzPixelFormat_RG32UI:
+			format->dataFormat = GL_RG;
+			format->dataType = GL_UNSIGNED_INT;
+			format->internalFormat = GL_RG32UI;
+			return true;
+
 		case nzPixelFormat_RGB5A1:
 			format->dataFormat = GL_RGBA;
 			format->dataType = GL_UNSIGNED_SHORT_5_5_5_1;
@@ -1390,14 +1564,20 @@ bool NzOpenGL::TranslateFormat(nzPixelFormat pixelFormat, Format* format, Format
 
 		case nzPixelFormat_RGB16F:
 			format->dataFormat = GL_RGB;
-			format->dataType = GL_FLOAT;
+			format->dataType = GL_HALF_FLOAT; ///FIXME: Correct ?
 			format->internalFormat = GL_RGB16F;
 			return true;
 
 		case nzPixelFormat_RGB16I:
 			format->dataFormat = GL_RGB;
-			format->dataType = GL_INT;
+			format->dataType = GL_SHORT;
 			format->internalFormat = GL_RGB16I;
+			return true;
+
+		case nzPixelFormat_RGB16UI:
+			format->dataFormat = GL_RGB;
+			format->dataType = GL_UNSIGNED_SHORT;
+			format->internalFormat = GL_RGB16UI;
 			return true;
 
 		case nzPixelFormat_RGB32F:
@@ -1410,6 +1590,12 @@ bool NzOpenGL::TranslateFormat(nzPixelFormat pixelFormat, Format* format, Format
 			format->dataFormat = GL_RGB;
 			format->dataType = GL_INT;
 			format->internalFormat = GL_RGB32I;
+			return true;
+
+		case nzPixelFormat_RGB32UI:
+			format->dataFormat = GL_RGB;
+			format->dataType = GL_UNSIGNED_INT;
+			format->internalFormat = GL_RGB32UI;
 			return true;
 
 		case nzPixelFormat_RGBA4:
@@ -1426,14 +1612,20 @@ bool NzOpenGL::TranslateFormat(nzPixelFormat pixelFormat, Format* format, Format
 
 		case nzPixelFormat_RGBA16F:
 			format->dataFormat = GL_RGBA;
-			format->dataType = GL_FLOAT;
+			format->dataType = GL_HALF_FLOAT; ///FIXME: Correct ?
 			format->internalFormat = GL_RGBA16F;
 			return true;
 
 		case nzPixelFormat_RGBA16I:
 			format->dataFormat = GL_RGBA;
+			format->dataType = GL_SHORT;
+			format->internalFormat = GL_RGBA16I;
+			return true;
+
+		case nzPixelFormat_RGBA16UI:
+			format->dataFormat = GL_RGBA;
 			format->dataType = GL_INT;
-			format->internalFormat = GL_RGBA32I;
+			format->internalFormat = GL_RGBA16UI;
 			return true;
 
 		case nzPixelFormat_RGBA32F:
@@ -1448,21 +1640,27 @@ bool NzOpenGL::TranslateFormat(nzPixelFormat pixelFormat, Format* format, Format
 			format->internalFormat = GL_RGB32I;
 			return true;
 
+		case nzPixelFormat_RGBA32UI:
+			format->dataFormat = GL_RGB;
+			format->dataType = GL_UNSIGNED_INT;
+			format->internalFormat = GL_RGB32UI;
+			return true;
+
 		case nzPixelFormat_Depth16:
 			format->dataFormat = GL_DEPTH_COMPONENT;
-			format->dataType = GL_UNSIGNED_BYTE;
+			format->dataType = GL_UNSIGNED_SHORT;
 			format->internalFormat = GL_DEPTH_COMPONENT16;
 			return true;
 
 		case nzPixelFormat_Depth24:
 			format->dataFormat = GL_DEPTH_COMPONENT;
-			format->dataType = GL_UNSIGNED_BYTE;
+			format->dataType = GL_UNSIGNED_INT;
 			format->internalFormat = GL_DEPTH_COMPONENT24;
 			return true;
 
 		case nzPixelFormat_Depth24Stencil8:
 			format->dataFormat = GL_DEPTH_STENCIL;
-			format->dataType = GL_UNSIGNED_BYTE;
+			format->dataType = GL_UNSIGNED_INT_24_8;
 			format->internalFormat = GL_DEPTH24_STENCIL8;
 			return true;
 
@@ -1555,7 +1753,7 @@ void NzOpenGL::OnContextChange(const NzContext* newContext)
 	s_contextStates = (newContext) ? &s_contexts[newContext] : nullptr;
 }
 
-GLenum NzOpenGL::Attachment[nzAttachmentPoint_Max+1] =
+GLenum NzOpenGL::Attachment[] =
 {
 	GL_COLOR_ATTACHMENT0,        // nzAttachmentPoint_Color
 	GL_DEPTH_ATTACHMENT,         // nzAttachmentPoint_Depth
@@ -1565,7 +1763,7 @@ GLenum NzOpenGL::Attachment[nzAttachmentPoint_Max+1] =
 
 static_assert(sizeof(NzOpenGL::Attachment)/sizeof(GLenum) == nzAttachmentPoint_Max+1, "Attachment array is incomplete");
 
-nzUInt8 NzOpenGL::AttributeIndex[nzAttributeUsage_Max+1] =
+nzUInt8 NzOpenGL::AttributeIndex[] =
 {
 	10, // nzAttributeUsage_InstanceData0
 	11, // nzAttributeUsage_InstanceData1
@@ -1587,7 +1785,7 @@ nzUInt8 NzOpenGL::AttributeIndex[nzAttributeUsage_Max+1] =
 
 static_assert(sizeof(NzOpenGL::AttributeIndex)/sizeof(nzUInt8) == nzAttributeUsage_Max+1, "Attribute index array is incomplete");
 
-GLenum NzOpenGL::AttributeType[nzAttributeType_Max+1] =
+GLenum NzOpenGL::AttributeType[] =
 {
 	GL_UNSIGNED_BYTE, // nzAttributeType_Color
 	GL_DOUBLE,        // nzAttributeType_Double1
@@ -1602,7 +1800,7 @@ GLenum NzOpenGL::AttributeType[nzAttributeType_Max+1] =
 
 static_assert(sizeof(NzOpenGL::AttributeType)/sizeof(GLenum) == nzAttributeType_Max+1, "Attribute type array is incomplete");
 
-GLenum NzOpenGL::BlendFunc[nzBlendFunc_Max+1] =
+GLenum NzOpenGL::BlendFunc[] =
 {
 	GL_DST_ALPHA,           // nzBlendFunc_DestAlpha
 	GL_DST_COLOR,           // nzBlendFunc_DestColor
@@ -1618,7 +1816,7 @@ GLenum NzOpenGL::BlendFunc[nzBlendFunc_Max+1] =
 
 static_assert(sizeof(NzOpenGL::BlendFunc)/sizeof(GLenum) == nzBlendFunc_Max+1, "Blend func array is incomplete");
 
-GLenum NzOpenGL::BufferLock[nzBufferAccess_Max+1] =
+GLenum NzOpenGL::BufferLock[] =
 {
 	GL_WRITE_ONLY, // nzBufferAccess_DiscardAndWrite
 	GL_READ_ONLY,  // nzBufferAccess_ReadOnly
@@ -1628,7 +1826,7 @@ GLenum NzOpenGL::BufferLock[nzBufferAccess_Max+1] =
 
 static_assert(sizeof(NzOpenGL::BufferLock)/sizeof(GLenum) == nzBufferAccess_Max+1, "Buffer lock array is incomplete");
 
-GLenum NzOpenGL::BufferLockRange[nzBufferAccess_Max+1] =
+GLenum NzOpenGL::BufferLockRange[] =
 {
 	GL_MAP_INVALIDATE_BUFFER_BIT | GL_MAP_WRITE_BIT, // nzBufferAccess_DiscardAndWrite
 	GL_MAP_READ_BIT,                                 // nzBufferAccess_ReadOnly
@@ -1638,7 +1836,7 @@ GLenum NzOpenGL::BufferLockRange[nzBufferAccess_Max+1] =
 
 static_assert(sizeof(NzOpenGL::BufferLockRange)/sizeof(GLenum) == nzBufferAccess_Max+1, "Buffer lock range array is incomplete");
 
-GLenum NzOpenGL::BufferTarget[nzBufferType_Max+1] =
+GLenum NzOpenGL::BufferTarget[] =
 {
 	GL_ELEMENT_ARRAY_BUFFER, // nzBufferType_Index,
 	GL_ARRAY_BUFFER,		 // nzBufferType_Vertex
@@ -1646,7 +1844,7 @@ GLenum NzOpenGL::BufferTarget[nzBufferType_Max+1] =
 
 static_assert(sizeof(NzOpenGL::BufferTarget)/sizeof(GLenum) == nzBufferType_Max+1, "Buffer target array is incomplete");
 
-GLenum NzOpenGL::BufferTargetBinding[nzBufferType_Max+1] =
+GLenum NzOpenGL::BufferTargetBinding[] =
 {
 	GL_ELEMENT_ARRAY_BUFFER_BINDING, // nzBufferType_Index,
 	GL_ARRAY_BUFFER_BINDING,		 // nzBufferType_Vertex
@@ -1654,7 +1852,7 @@ GLenum NzOpenGL::BufferTargetBinding[nzBufferType_Max+1] =
 
 static_assert(sizeof(NzOpenGL::BufferTargetBinding)/sizeof(GLenum) == nzBufferType_Max+1, "Buffer target binding array is incomplete");
 
-GLenum NzOpenGL::BufferUsage[nzBufferUsage_Max+1] =
+GLenum NzOpenGL::BufferUsage[] =
 {
 	// J'ai choisi DYNAMIC à la place de STREAM car DYNAMIC semble plus adapté au profil "une mise à jour pour quelques rendus"
 	// Ce qui est je pense le scénario qui arrivera le plus souvent (Prévoir une option pour permettre d'utiliser le STREAM_DRAW ?)
@@ -1665,7 +1863,7 @@ GLenum NzOpenGL::BufferUsage[nzBufferUsage_Max+1] =
 
 static_assert(sizeof(NzOpenGL::BufferUsage)/sizeof(GLenum) == nzBufferUsage_Max+1, "Buffer usage array is incomplete");
 
-GLenum NzOpenGL::CubemapFace[6] =
+GLenum NzOpenGL::CubemapFace[] =
 {
 	GL_TEXTURE_CUBE_MAP_POSITIVE_X, // nzCubemapFace_PositiveX
 	GL_TEXTURE_CUBE_MAP_NEGATIVE_X, // nzCubemapFace_NegativeX
@@ -1677,16 +1875,7 @@ GLenum NzOpenGL::CubemapFace[6] =
 
 static_assert(sizeof(NzOpenGL::CubemapFace)/sizeof(GLenum) == 6, "Cubemap face array is incomplete");
 
-GLenum NzOpenGL::FaceCulling[nzFaceCulling_Max+1] =
-{
-	GL_BACK,          // nzFaceCulling_Back
-	GL_FRONT,	      // nzFaceCulling_Front
-	GL_FRONT_AND_BACK // nzFaceCulling_FrontAndBack
-};
-
-static_assert(sizeof(NzOpenGL::FaceCulling)/sizeof(GLenum) == nzFaceCulling_Max+1, "Face culling array is incomplete");
-
-GLenum NzOpenGL::FaceFilling[nzFaceFilling_Max+1] =
+GLenum NzOpenGL::FaceFilling[] =
 {
 	GL_POINT, // nzFaceFilling_Point
 	GL_LINE,  // nzFaceFilling_Line
@@ -1695,7 +1884,16 @@ GLenum NzOpenGL::FaceFilling[nzFaceFilling_Max+1] =
 
 static_assert(sizeof(NzOpenGL::FaceFilling)/sizeof(GLenum) == nzFaceFilling_Max+1, "Face filling array is incomplete");
 
-GLenum NzOpenGL::PrimitiveMode[nzPrimitiveMode_Max+1] =
+GLenum NzOpenGL::FaceSide[] =
+{
+	GL_BACK,          // nzFaceSide_Back
+	GL_FRONT,         // nzFaceSide_Front
+	GL_FRONT_AND_BACK // nzFaceSide_FrontAndBack
+};
+
+static_assert(sizeof(NzOpenGL::FaceSide)/sizeof(GLenum) == nzFaceSide_Max+1, "Face side array is incomplete");
+
+GLenum NzOpenGL::PrimitiveMode[] =
 {
 	GL_LINES,          // nzPrimitiveMode_LineList
 	GL_LINE_STRIP,     // nzPrimitiveMode_LineStrip
@@ -1707,7 +1905,29 @@ GLenum NzOpenGL::PrimitiveMode[nzPrimitiveMode_Max+1] =
 
 static_assert(sizeof(NzOpenGL::PrimitiveMode)/sizeof(GLenum) == nzPrimitiveMode_Max+1, "Primitive mode array is incomplete");
 
-GLenum NzOpenGL::RendererComparison[nzRendererComparison_Max+1] =
+GLenum NzOpenGL::QueryCondition[] =
+{
+	GL_QUERY_WAIT,              // nzGpuQueryCondition_NoWait
+	GL_QUERY_BY_REGION_NO_WAIT, // nzGpuQueryCondition_Region_NoWait
+	GL_QUERY_BY_REGION_WAIT,    // nzGpuQueryCondition_Region_Wait
+	GL_QUERY_WAIT               // nzGpuQueryCondition_Wait
+};
+
+static_assert(sizeof(NzOpenGL::QueryCondition)/sizeof(GLenum) == nzGpuQueryCondition_Max+1, "Query condition array is incomplete");
+
+GLenum NzOpenGL::QueryMode[] =
+{
+	GL_ANY_SAMPLES_PASSED,                   // nzGpuQueryMode_AnySamplesPassed
+	GL_ANY_SAMPLES_PASSED_CONSERVATIVE,      // nzGpuQueryMode_AnySamplesPassedConservative
+	GL_PRIMITIVES_GENERATED,                 // nzGpuQueryMode_PrimitiveGenerated
+	GL_SAMPLES_PASSED,                       // nzGpuQueryMode_SamplesPassed
+	GL_TIME_ELAPSED,                         // nzGpuQueryMode_TimeElapsed
+	GL_TRANSFORM_FEEDBACK_PRIMITIVES_WRITTEN // nzGpuQueryMode_TransformFeedbackPrimitivesWritten
+};
+
+static_assert(sizeof(NzOpenGL::QueryMode)/sizeof(GLenum) == nzGpuQueryMode_Max+1, "Query mode array is incomplete");
+
+GLenum NzOpenGL::RendererComparison[] =
 {
 	GL_ALWAYS,  // nzRendererComparison_Always
 	GL_EQUAL,   // nzRendererComparison_Equal
@@ -1715,12 +1935,13 @@ GLenum NzOpenGL::RendererComparison[nzRendererComparison_Max+1] =
 	GL_GEQUAL,  // nzRendererComparison_GreaterOrEqual
 	GL_LESS,    // nzRendererComparison_Less
 	GL_LEQUAL,  // nzRendererComparison_LessOrEqual
-	GL_NEVER    // nzRendererComparison_Never
+	GL_NEVER,   // nzRendererComparison_Never
+	GL_NOTEQUAL // nzRendererComparison_NotEqual
 };
 
 static_assert(sizeof(NzOpenGL::RendererComparison)/sizeof(GLenum) == nzRendererComparison_Max+1, "Renderer comparison array is incomplete");
 
-GLenum NzOpenGL::RendererParameter[nzRendererParameter_Max+1] =
+GLenum NzOpenGL::RendererParameter[] =
 {
 	GL_BLEND,        // nzRendererParameter_Blend
 	GL_NONE,         // nzRendererParameter_ColorWrite
@@ -1733,7 +1954,7 @@ GLenum NzOpenGL::RendererParameter[nzRendererParameter_Max+1] =
 
 static_assert(sizeof(NzOpenGL::RendererParameter)/sizeof(GLenum) == nzRendererParameter_Max+1, "Renderer parameter array is incomplete");
 
-GLenum NzOpenGL::SamplerWrapMode[nzSamplerWrap_Max+1] =
+GLenum NzOpenGL::SamplerWrapMode[] =
 {
 	GL_CLAMP_TO_EDGE,   // nzTextureWrap_Clamp
 	GL_MIRRORED_REPEAT, // nzSamplerWrap_MirroredRepeat
@@ -1742,7 +1963,7 @@ GLenum NzOpenGL::SamplerWrapMode[nzSamplerWrap_Max+1] =
 
 static_assert(sizeof(NzOpenGL::SamplerWrapMode)/sizeof(GLenum) == nzSamplerWrap_Max+1, "Sampler wrap mode array is incomplete");
 
-GLenum NzOpenGL::ShaderType[nzShaderType_Max+1] =
+GLenum NzOpenGL::ShaderType[] =
 {
 	GL_FRAGMENT_SHADER,	// nzShaderType_Fragment
 	GL_GEOMETRY_SHADER,	// nzShaderType_Geometry
@@ -1751,12 +1972,12 @@ GLenum NzOpenGL::ShaderType[nzShaderType_Max+1] =
 
 static_assert(sizeof(NzOpenGL::ShaderType)/sizeof(GLenum) == nzShaderType_Max+1, "Shader type array is incomplete");
 
-GLenum NzOpenGL::StencilOperation[nzStencilOperation_Max+1] =
+GLenum NzOpenGL::StencilOperation[] =
 {
 	GL_DECR,      // nzStencilOperation_Decrement
-	GL_DECR_WRAP, // nzStencilOperation_DecrementToSaturation
+	GL_DECR_WRAP, // nzStencilOperation_DecrementNoClamp
 	GL_INCR,      // nzStencilOperation_Increment
-	GL_INCR_WRAP, // nzStencilOperation_IncrementToSaturation
+	GL_INCR_WRAP, // nzStencilOperation_IncrementNoClamp
 	GL_INVERT,    // nzStencilOperation_Invert
 	GL_KEEP,      // nzStencilOperation_Keep
 	GL_REPLACE,   // nzStencilOperation_Replace
@@ -1765,7 +1986,7 @@ GLenum NzOpenGL::StencilOperation[nzStencilOperation_Max+1] =
 
 static_assert(sizeof(NzOpenGL::StencilOperation)/sizeof(GLenum) == nzStencilOperation_Max+1, "Stencil operation array is incomplete");
 
-GLenum NzOpenGL::TextureTarget[nzImageType_Max+1] =
+GLenum NzOpenGL::TextureTarget[] =
 {
 	GL_TEXTURE_1D,       // nzImageType_1D
 	GL_TEXTURE_1D_ARRAY, // nzImageType_1D_Array
@@ -1777,7 +1998,7 @@ GLenum NzOpenGL::TextureTarget[nzImageType_Max+1] =
 
 static_assert(sizeof(NzOpenGL::TextureTarget)/sizeof(GLenum) == nzImageType_Max+1, "Texture target array is incomplete");
 
-GLenum NzOpenGL::TextureTargetBinding[nzImageType_Max+1] =
+GLenum NzOpenGL::TextureTargetBinding[] =
 {
 	GL_TEXTURE_BINDING_1D,       // nzImageType_1D
 	GL_TEXTURE_BINDING_1D_ARRAY, // nzImageType_1D_Array
@@ -1789,7 +2010,7 @@ GLenum NzOpenGL::TextureTargetBinding[nzImageType_Max+1] =
 
 static_assert(sizeof(NzOpenGL::TextureTargetBinding)/sizeof(GLenum) == nzImageType_Max+1, "Texture target binding array is incomplete");
 
-GLenum NzOpenGL::TextureTargetProxy[nzImageType_Max+1] =
+GLenum NzOpenGL::TextureTargetProxy[] =
 {
 	GL_PROXY_TEXTURE_1D,       // nzImageType_1D
 	GL_PROXY_TEXTURE_1D_ARRAY, // nzImageType_1D_Array
@@ -1803,6 +2024,7 @@ static_assert(sizeof(NzOpenGL::TextureTargetProxy)/sizeof(GLenum) == nzImageType
 
 PFNGLACTIVETEXTUREPROC            glActiveTexture            = nullptr;
 PFNGLATTACHSHADERPROC             glAttachShader             = nullptr;
+PFNGLBEGINCONDITIONALRENDERPROC   glBeginConditionalRender   = nullptr;
 PFNGLBEGINQUERYPROC               glBeginQuery               = nullptr;
 PFNGLBINDATTRIBLOCATIONPROC       glBindAttribLocation       = nullptr;
 PFNGLBINDBUFFERPROC               glBindBuffer               = nullptr;
@@ -1813,6 +2035,7 @@ PFNGLBINDSAMPLERPROC              glBindSampler              = nullptr;
 PFNGLBINDTEXTUREPROC              glBindTexture              = nullptr;
 PFNGLBINDVERTEXARRAYPROC          glBindVertexArray          = nullptr;
 PFNGLBLENDFUNCPROC                glBlendFunc                = nullptr;
+PFNGLBLENDFUNCSEPARATEPROC        glBlendFuncSeparate        = nullptr;
 PFNGLBUFFERDATAPROC               glBufferData               = nullptr;
 PFNGLBUFFERSUBDATAPROC            glBufferSubData            = nullptr;
 PFNGLCLEARPROC                    glClear                    = nullptr;
@@ -1851,6 +2074,7 @@ PFNGLDRAWELEMENTSINSTANCEDPROC    glDrawElementsInstanced    = nullptr;
 PFNGLDRAWTEXTURENVPROC            glDrawTexture              = nullptr;
 PFNGLENABLEPROC                   glEnable                   = nullptr;
 PFNGLENABLEVERTEXATTRIBARRAYPROC  glEnableVertexAttribArray  = nullptr;
+PFNGLENDCONDITIONALRENDERPROC     glEndConditionalRender     = nullptr;
 PFNGLENDQUERYPROC                 glEndQuery                 = nullptr;
 PFNGLFLUSHPROC                    glFlush                    = nullptr;
 PFNGLFRAMEBUFFERRENDERBUFFERPROC  glFramebufferRenderbuffer  = nullptr;
@@ -1904,12 +2128,18 @@ PFNGLPROGRAMPARAMETERIPROC        glProgramParameteri        = nullptr;
 PFNGLPROGRAMUNIFORM1DPROC         glProgramUniform1d         = nullptr;
 PFNGLPROGRAMUNIFORM1FPROC         glProgramUniform1f         = nullptr;
 PFNGLPROGRAMUNIFORM1IPROC         glProgramUniform1i         = nullptr;
+PFNGLPROGRAMUNIFORM1DVPROC        glProgramUniform1dv        = nullptr;
+PFNGLPROGRAMUNIFORM1FVPROC        glProgramUniform1fv        = nullptr;
+PFNGLPROGRAMUNIFORM1IVPROC        glProgramUniform1iv        = nullptr;
 PFNGLPROGRAMUNIFORM2DVPROC        glProgramUniform2dv        = nullptr;
 PFNGLPROGRAMUNIFORM2FVPROC        glProgramUniform2fv        = nullptr;
+PFNGLPROGRAMUNIFORM2IVPROC        glProgramUniform2iv        = nullptr;
 PFNGLPROGRAMUNIFORM3DVPROC        glProgramUniform3dv        = nullptr;
 PFNGLPROGRAMUNIFORM3FVPROC        glProgramUniform3fv        = nullptr;
+PFNGLPROGRAMUNIFORM3IVPROC        glProgramUniform3iv        = nullptr;
 PFNGLPROGRAMUNIFORM4DVPROC        glProgramUniform4dv        = nullptr;
 PFNGLPROGRAMUNIFORM4FVPROC        glProgramUniform4fv        = nullptr;
+PFNGLPROGRAMUNIFORM4IVPROC        glProgramUniform4iv        = nullptr;
 PFNGLPROGRAMUNIFORMMATRIX4DVPROC  glProgramUniformMatrix4dv  = nullptr;
 PFNGLPROGRAMUNIFORMMATRIX4FVPROC  glProgramUniformMatrix4fv  = nullptr;
 PFNGLREADPIXELSPROC               glReadPixels               = nullptr;
@@ -1919,7 +2149,9 @@ PFNGLSAMPLERPARAMETERIPROC        glSamplerParameteri        = nullptr;
 PFNGLSCISSORPROC                  glScissor                  = nullptr;
 PFNGLSHADERSOURCEPROC             glShaderSource             = nullptr;
 PFNGLSTENCILFUNCPROC              glStencilFunc              = nullptr;
+PFNGLSTENCILFUNCSEPARATEPROC      glStencilFuncSeparate      = nullptr;
 PFNGLSTENCILOPPROC                glStencilOp                = nullptr;
+PFNGLSTENCILOPSEPARATEPROC        glStencilOpSeparate        = nullptr;
 PFNGLTEXIMAGE1DPROC               glTexImage1D               = nullptr;
 PFNGLTEXIMAGE2DPROC               glTexImage2D               = nullptr;
 PFNGLTEXIMAGE3DPROC               glTexImage3D               = nullptr;
@@ -1934,12 +2166,18 @@ PFNGLTEXSUBIMAGE3DPROC            glTexSubImage3D            = nullptr;
 PFNGLUNIFORM1DPROC                glUniform1d                = nullptr;
 PFNGLUNIFORM1FPROC                glUniform1f                = nullptr;
 PFNGLUNIFORM1IPROC                glUniform1i                = nullptr;
+PFNGLUNIFORM1DVPROC               glUniform1dv               = nullptr;
+PFNGLUNIFORM1FVPROC               glUniform1fv               = nullptr;
+PFNGLUNIFORM1IVPROC               glUniform1iv               = nullptr;
 PFNGLUNIFORM2DVPROC               glUniform2dv               = nullptr;
 PFNGLUNIFORM2FVPROC               glUniform2fv               = nullptr;
+PFNGLUNIFORM2IVPROC               glUniform2iv               = nullptr;
 PFNGLUNIFORM3DVPROC               glUniform3dv               = nullptr;
 PFNGLUNIFORM3FVPROC               glUniform3fv               = nullptr;
+PFNGLUNIFORM3IVPROC               glUniform3iv               = nullptr;
 PFNGLUNIFORM4DVPROC               glUniform4dv               = nullptr;
 PFNGLUNIFORM4FVPROC               glUniform4fv               = nullptr;
+PFNGLUNIFORM4IVPROC               glUniform4iv               = nullptr;
 PFNGLUNIFORMMATRIX4DVPROC         glUniformMatrix4dv         = nullptr;
 PFNGLUNIFORMMATRIX4FVPROC         glUniformMatrix4fv         = nullptr;
 PFNGLUNMAPBUFFERPROC              glUnmapBuffer              = nullptr;

@@ -29,6 +29,7 @@
 enum nzOpenGLExtension
 {
 	nzOpenGLExtension_AnisotropicFilter,
+	nzOpenGLExtension_ConditionalRender,
 	nzOpenGLExtension_DebugOutput,
 	nzOpenGLExtension_DrawInstanced,
 	nzOpenGLExtension_FP64,
@@ -90,8 +91,8 @@ class NAZARA_API NzOpenGL
 
 		static GLuint GetCurrentBuffer(nzBufferType type);
 		static GLuint GetCurrentProgram();
-		static const NzRenderTarget* GetCurrentTarget();
 		static NzRecti GetCurrentScissorBox();
+		static const NzRenderTarget* GetCurrentTarget();
 		static GLuint GetCurrentTexture();
 		static GLuint GetCurrentTexture(unsigned int textureUnit);
 		static unsigned int GetCurrentTextureUnit();
@@ -110,8 +111,8 @@ class NAZARA_API NzOpenGL
 		static bool IsSupported(const NzString& string);
 
 		static void SetBuffer(nzBufferType type, GLuint id);
-		static void SetScissorBox(const NzRecti& scissorBox);
 		static void SetProgram(GLuint id);
+		static void SetScissorBox(const NzRecti& scissorBox);
 		static void SetTarget(const NzRenderTarget* renderTarget);
 		static void SetTexture(GLuint id);
 		static void SetTexture(unsigned int textureUnit, GLuint id);
@@ -132,9 +133,11 @@ class NAZARA_API NzOpenGL
 		static GLenum BufferTargetBinding[nzBufferType_Max+1];
 		static GLenum BufferUsage[nzBufferUsage_Max+1];
 		static GLenum CubemapFace[6]; // Un cube possède six faces et ça n'est pas prêt de changer
-		static GLenum FaceCulling[nzFaceCulling_Max+1];
 		static GLenum FaceFilling[nzFaceFilling_Max+1];
+		static GLenum FaceSide[nzFaceSide_Max+1];
 		static GLenum PrimitiveMode[nzPrimitiveMode_Max+1];
+		static GLenum QueryCondition[nzGpuQueryCondition_Max+1];
+		static GLenum QueryMode[nzGpuQueryMode_Max+1];
 		static GLenum RendererComparison[nzRendererComparison_Max+1];
 		static GLenum RendererParameter[nzRendererParameter_Max+1];
 		static GLenum SamplerWrapMode[nzSamplerWrap_Max+1];
@@ -151,6 +154,7 @@ class NAZARA_API NzOpenGL
 
 NAZARA_API extern PFNGLACTIVETEXTUREPROC            glActiveTexture;
 NAZARA_API extern PFNGLATTACHSHADERPROC             glAttachShader;
+NAZARA_API extern PFNGLBEGINCONDITIONALRENDERPROC   glBeginConditionalRender;
 NAZARA_API extern PFNGLBEGINQUERYPROC               glBeginQuery;
 NAZARA_API extern PFNGLBINDATTRIBLOCATIONPROC       glBindAttribLocation;
 NAZARA_API extern PFNGLBINDBUFFERPROC               glBindBuffer;
@@ -161,6 +165,7 @@ NAZARA_API extern PFNGLBINDSAMPLERPROC              glBindSampler;
 NAZARA_API extern PFNGLBINDTEXTUREPROC              glBindTexture;
 NAZARA_API extern PFNGLBINDVERTEXARRAYPROC          glBindVertexArray;
 NAZARA_API extern PFNGLBLENDFUNCPROC                glBlendFunc;
+NAZARA_API extern PFNGLBLENDFUNCSEPARATEPROC        glBlendFuncSeparate;
 NAZARA_API extern PFNGLBUFFERDATAPROC               glBufferData;
 NAZARA_API extern PFNGLBUFFERSUBDATAPROC            glBufferSubData;
 NAZARA_API extern PFNGLCLEARPROC                    glClear;
@@ -199,6 +204,7 @@ NAZARA_API extern PFNGLDRAWELEMENTSINSTANCEDPROC    glDrawElementsInstanced;
 NAZARA_API extern PFNGLDRAWTEXTURENVPROC            glDrawTexture;
 NAZARA_API extern PFNGLENABLEPROC                   glEnable;
 NAZARA_API extern PFNGLENABLEVERTEXATTRIBARRAYPROC  glEnableVertexAttribArray;
+NAZARA_API extern PFNGLENDCONDITIONALRENDERPROC     glEndConditionalRender;
 NAZARA_API extern PFNGLENDQUERYPROC                 glEndQuery;
 NAZARA_API extern PFNGLFLUSHPROC                    glFlush;
 NAZARA_API extern PFNGLFRAMEBUFFERRENDERBUFFERPROC  glFramebufferRenderbuffer;
@@ -252,12 +258,18 @@ NAZARA_API extern PFNGLPROGRAMPARAMETERIPROC        glProgramParameteri;
 NAZARA_API extern PFNGLPROGRAMUNIFORM1DPROC         glProgramUniform1d;
 NAZARA_API extern PFNGLPROGRAMUNIFORM1FPROC         glProgramUniform1f;
 NAZARA_API extern PFNGLPROGRAMUNIFORM1IPROC         glProgramUniform1i;
+NAZARA_API extern PFNGLPROGRAMUNIFORM1DVPROC        glProgramUniform1dv;
+NAZARA_API extern PFNGLPROGRAMUNIFORM1FVPROC        glProgramUniform1fv;
+NAZARA_API extern PFNGLPROGRAMUNIFORM1IVPROC        glProgramUniform1iv;
 NAZARA_API extern PFNGLPROGRAMUNIFORM2DVPROC        glProgramUniform2dv;
 NAZARA_API extern PFNGLPROGRAMUNIFORM2FVPROC        glProgramUniform2fv;
+NAZARA_API extern PFNGLPROGRAMUNIFORM2IVPROC        glProgramUniform2iv;
 NAZARA_API extern PFNGLPROGRAMUNIFORM3DVPROC        glProgramUniform3dv;
 NAZARA_API extern PFNGLPROGRAMUNIFORM3FVPROC        glProgramUniform3fv;
+NAZARA_API extern PFNGLPROGRAMUNIFORM3IVPROC        glProgramUniform3iv;
 NAZARA_API extern PFNGLPROGRAMUNIFORM4DVPROC        glProgramUniform4dv;
 NAZARA_API extern PFNGLPROGRAMUNIFORM4FVPROC        glProgramUniform4fv;
+NAZARA_API extern PFNGLPROGRAMUNIFORM4IVPROC        glProgramUniform4iv;
 NAZARA_API extern PFNGLPROGRAMUNIFORMMATRIX4DVPROC  glProgramUniformMatrix4dv;
 NAZARA_API extern PFNGLPROGRAMUNIFORMMATRIX4FVPROC  glProgramUniformMatrix4fv;
 NAZARA_API extern PFNGLREADPIXELSPROC               glReadPixels;
@@ -267,7 +279,9 @@ NAZARA_API extern PFNGLSAMPLERPARAMETERIPROC        glSamplerParameteri;
 NAZARA_API extern PFNGLSCISSORPROC                  glScissor;
 NAZARA_API extern PFNGLSHADERSOURCEPROC             glShaderSource;
 NAZARA_API extern PFNGLSTENCILFUNCPROC              glStencilFunc;
+NAZARA_API extern PFNGLSTENCILFUNCSEPARATEPROC      glStencilFuncSeparate;
 NAZARA_API extern PFNGLSTENCILOPPROC                glStencilOp;
+NAZARA_API extern PFNGLSTENCILOPSEPARATEPROC        glStencilOpSeparate;
 NAZARA_API extern PFNGLTEXIMAGE1DPROC               glTexImage1D;
 NAZARA_API extern PFNGLTEXIMAGE2DPROC               glTexImage2D;
 NAZARA_API extern PFNGLTEXIMAGE3DPROC               glTexImage3D;
@@ -282,12 +296,18 @@ NAZARA_API extern PFNGLTEXSUBIMAGE3DPROC            glTexSubImage3D;
 NAZARA_API extern PFNGLUNIFORM1DPROC                glUniform1d;
 NAZARA_API extern PFNGLUNIFORM1FPROC                glUniform1f;
 NAZARA_API extern PFNGLUNIFORM1IPROC                glUniform1i;
+NAZARA_API extern PFNGLUNIFORM1DVPROC               glUniform1dv;
+NAZARA_API extern PFNGLUNIFORM1FVPROC               glUniform1fv;
+NAZARA_API extern PFNGLUNIFORM1IVPROC               glUniform1iv;
 NAZARA_API extern PFNGLUNIFORM2DVPROC               glUniform2dv;
 NAZARA_API extern PFNGLUNIFORM2FVPROC               glUniform2fv;
+NAZARA_API extern PFNGLUNIFORM2IVPROC               glUniform2iv;
 NAZARA_API extern PFNGLUNIFORM3DVPROC               glUniform3dv;
 NAZARA_API extern PFNGLUNIFORM3FVPROC               glUniform3fv;
+NAZARA_API extern PFNGLUNIFORM3IVPROC               glUniform3iv;
 NAZARA_API extern PFNGLUNIFORM4DVPROC               glUniform4dv;
 NAZARA_API extern PFNGLUNIFORM4FVPROC               glUniform4fv;
+NAZARA_API extern PFNGLUNIFORM4IVPROC               glUniform4iv;
 NAZARA_API extern PFNGLUNIFORMMATRIX4DVPROC         glUniformMatrix4dv;
 NAZARA_API extern PFNGLUNIFORMMATRIX4FVPROC         glUniformMatrix4fv;
 NAZARA_API extern PFNGLUNMAPBUFFERPROC              glUnmapBuffer;

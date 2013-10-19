@@ -52,7 +52,7 @@ bool NzMTLParser::Parse()
 				if (!currentMaterial)
 					currentMaterial = &m_materials["default"];
 
-				currentMaterial->ambient = NzColor(r*255.f, g*255.f, b*255.f);
+				currentMaterial->ambient = NzColor(static_cast<nzUInt8>(r*255.f), static_cast<nzUInt8>(g*255.f), static_cast<nzUInt8>(b*255.f));
 			}
 			#if NAZARA_UTILITY_STRICT_RESOURCE_PARSING
 			else
@@ -67,7 +67,7 @@ bool NzMTLParser::Parse()
 				if (!currentMaterial)
 					currentMaterial = &m_materials["default"];
 
-				currentMaterial->diffuse = NzColor(r*255.f, g*255.f, b*255.f);
+				currentMaterial->diffuse = NzColor(static_cast<nzUInt8>(r*255.f), static_cast<nzUInt8>(g*255.f), static_cast<nzUInt8>(b*255.f));
 			}
 			#if NAZARA_UTILITY_STRICT_RESOURCE_PARSING
 			else
@@ -82,7 +82,7 @@ bool NzMTLParser::Parse()
 				if (!currentMaterial)
 					currentMaterial = &m_materials["default"];
 
-				currentMaterial->specular = NzColor(r*255.f, g*255.f, b*255.f);
+				currentMaterial->specular = NzColor(static_cast<nzUInt8>(r*255.f), static_cast<nzUInt8>(g*255.f), static_cast<nzUInt8>(b*255.f));
 			}
 			#if NAZARA_UTILITY_STRICT_RESOURCE_PARSING
 			else
@@ -119,7 +119,7 @@ bool NzMTLParser::Parse()
 				UnrecognizedLine();
 			#endif
 		}
-		else if (keyword == 'd' || keyword == "tr")
+		else if (keyword == 'd')
 		{
 			float alpha;
 			if (std::sscanf(&m_currentLine[(keyword[0] == 'd') ? 2 : 3], "%f", &alpha) == 1)
@@ -128,6 +128,21 @@ bool NzMTLParser::Parse()
 					currentMaterial = &m_materials["default"];
 
 				currentMaterial->alpha = alpha;
+			}
+			#if NAZARA_UTILITY_STRICT_RESOURCE_PARSING
+			else
+				UnrecognizedLine();
+			#endif
+		}
+		else if (keyword == "tr")
+		{
+			float alpha;
+			if (std::sscanf(&m_currentLine[(keyword[0] == 'd') ? 2 : 3], "%f", &alpha) == 1)
+			{
+				if (!currentMaterial)
+					currentMaterial = &m_materials["default"];
+
+				currentMaterial->alpha = 1.f - alpha; // tr vaut pour la "valeur de transparence", 0 = opaque
 			}
 			#if NAZARA_UTILITY_STRICT_RESOURCE_PARSING
 			else

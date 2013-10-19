@@ -13,7 +13,11 @@ namespace
 	NzRenderStates BuildRenderStates()
 	{
 		NzRenderStates states;
-		states.parameters[nzRendererParameter_DepthBuffer] = false;
+		states.depthFunc = nzRendererComparison_Equal;
+		states.faceCulling = nzFaceSide_Back;
+		states.parameters[nzRendererParameter_DepthBuffer] = true;
+		states.parameters[nzRendererParameter_DepthWrite] = false;
+		states.parameters[nzRendererParameter_FaceCulling] = true;
 
 		return states;
 	}
@@ -43,12 +47,13 @@ void NzTextureBackground::Draw(const NzScene* scene) const
 
 	static NzRenderStates states(BuildRenderStates());
 
-	m_program->SendColor(m_program->GetUniformLocation(nzShaderUniform_MaterialDiffuse), NzColor::White);
-	m_program->SendInteger(m_program->GetUniformLocation(nzShaderUniform_MaterialDiffuseMap), 0);
-
 	NzRenderer::SetRenderStates(states);
 	NzRenderer::SetShaderProgram(m_program);
 	NzRenderer::SetTexture(0, m_texture);
+
+	m_program->SendColor(m_program->GetUniformLocation(nzShaderUniform_MaterialDiffuse), NzColor::White);
+	m_program->SendFloat(m_program->GetUniformLocation(nzShaderUniform_VertexDepth), 1.f);
+	m_program->SendInteger(m_program->GetUniformLocation(nzShaderUniform_MaterialDiffuseMap), 0);
 
 	NzRenderer::DrawFullscreenQuad();
 }

@@ -33,15 +33,6 @@ enum nzBlendFunc
 	nzBlendFunc_Max = nzBlendFunc_Zero
 };
 
-enum nzFaceCulling
-{
-	nzFaceCulling_Back,
-	nzFaceCulling_Front,
-	nzFaceCulling_FrontAndBack,
-
-	nzFaceCulling_Max = nzFaceCulling_FrontAndBack
-};
-
 enum nzFaceFilling
 {
 	nzFaceFilling_Point,
@@ -49,6 +40,37 @@ enum nzFaceFilling
 	nzFaceFilling_Fill,
 
 	nzFaceFilling_Max = nzFaceFilling_Fill
+};
+
+enum nzFaceSide
+{
+	nzFaceSide_Back,
+	nzFaceSide_Front,
+	nzFaceSide_FrontAndBack,
+
+	nzFaceSide_Max = nzFaceSide_FrontAndBack
+};
+
+enum nzGpuQueryCondition
+{
+	nzGpuQueryCondition_Region_NoWait,
+	nzGpuQueryCondition_Region_Wait,
+	nzGpuQueryCondition_NoWait,
+	nzGpuQueryCondition_Wait,
+
+	nzGpuQueryCondition_Max = nzGpuQueryCondition_Wait
+};
+
+enum nzGpuQueryMode
+{
+	nzGpuQueryMode_AnySamplesPassed,
+	nzGpuQueryMode_AnySamplesPassedConservative,
+	nzGpuQueryMode_PrimitiveGenerated,
+	nzGpuQueryMode_SamplesPassed,
+	nzGpuQueryMode_TimeElapsed,
+	nzGpuQueryMode_TransformFeedbackPrimitivesWritten,
+
+	nzGpuQueryMode_Max = nzGpuQueryMode_TransformFeedbackPrimitivesWritten
 };
 
 enum nzMatrixType
@@ -85,6 +107,7 @@ enum nzPixelBufferType
 enum nzRendererCap
 {
 	nzRendererCap_AnisotropicFilter,
+	nzRendererCap_ConditionalRendering,
 	nzRendererCap_FP64,
 	nzRendererCap_HardwareBuffer,
 	nzRendererCap_Instancing,
@@ -118,8 +141,9 @@ enum nzRendererComparison
 	nzRendererComparison_Less,
 	nzRendererComparison_LessOrEqual,
 	nzRendererComparison_Never,
+	nzRendererComparison_NotEqual,
 
-	nzRendererComparison_Max = nzRendererComparison_Never
+	nzRendererComparison_Max = nzRendererComparison_NotEqual
 };
 
 enum nzRendererParameter
@@ -216,6 +240,7 @@ enum nzShaderUniform
 	nzShaderUniform_ProjMatrix,
 	nzShaderUniform_SceneAmbient,
 	nzShaderUniform_TargetSize,
+	nzShaderUniform_VertexDepth,
 	nzShaderUniform_ViewMatrix,
 	nzShaderUniform_ViewProjMatrix,
 	nzShaderUniform_WorldMatrix,
@@ -237,9 +262,9 @@ enum nzShaderType
 enum nzStencilOperation
 {
 	nzStencilOperation_Decrement,
-	nzStencilOperation_DecrementToSaturation,
+	nzStencilOperation_DecrementNoClamp,
 	nzStencilOperation_Increment,
-	nzStencilOperation_IncrementToSaturation,
+	nzStencilOperation_IncrementNoClamp,
 	nzStencilOperation_Invert,
 	nzStencilOperation_Keep,
 	nzStencilOperation_Replace,

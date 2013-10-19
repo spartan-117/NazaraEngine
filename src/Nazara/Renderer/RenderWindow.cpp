@@ -7,6 +7,7 @@
 #include <Nazara/Core/Thread.hpp>
 #include <Nazara/Renderer/Context.hpp>
 #include <Nazara/Renderer/OpenGL.hpp>
+#include <Nazara/Renderer/Renderer.hpp>
 #include <Nazara/Renderer/Texture.hpp>
 #include <stdexcept>
 #include <Nazara/Renderer/Debug.hpp>
@@ -162,7 +163,7 @@ void NzRenderWindow::Display()
 {
 	if (m_framerateLimit > 0)
 	{
-		int remainingTime = 1000/m_framerateLimit - m_clock.GetMilliseconds();
+		int remainingTime = 1000/static_cast<int>(m_framerateLimit) - static_cast<int>(m_clock.GetMilliseconds());
 		if (remainingTime > 0)
 			NzThread::Sleep(remainingTime);
 
@@ -275,6 +276,11 @@ bool NzRenderWindow::Activate() const
 	}
 }
 
+void NzRenderWindow::EnsureTargetUpdated() const
+{
+	// Rien à faire
+}
+
 bool NzRenderWindow::OnWindowCreated()
 {
 	m_parameters.doubleBuffered = true;
@@ -313,6 +319,9 @@ void NzRenderWindow::OnWindowDestroy()
 {
 	if (m_context)
 	{
+		if (IsActive())
+			NzRenderer::SetTarget(nullptr);
+
 		delete m_context;
 		m_context = nullptr;
 	}

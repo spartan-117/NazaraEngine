@@ -74,9 +74,9 @@ void NzForwardRenderTechnique::Clear(const NzScene* scene)
 		background->Draw(scene);
 }
 
-void NzForwardRenderTechnique::Draw(const NzScene* scene)
+bool NzForwardRenderTechnique::Draw(const NzScene* scene)
 {
-	m_directionnalLights.SetLights(&m_renderQueue.directionnalLights[0], m_renderQueue.directionnalLights.size());
+	m_directionalLights.SetLights(&m_renderQueue.directionalLights[0], m_renderQueue.directionalLights.size());
 	m_lights.SetLights(&m_renderQueue.lights[0], m_renderQueue.lights.size());
 	m_renderQueue.Sort(scene->GetViewer());
 
@@ -92,6 +92,8 @@ void NzForwardRenderTechnique::Draw(const NzScene* scene)
 	// Les autres drawables (Exemple: Terrain)
 	for (const NzDrawable* drawable : m_renderQueue.otherDrawables)
 		drawable->Draw();
+
+	return true;
 
 	// Les billboards
 	/*if (!m_renderQueue.billboards.empty())
@@ -149,6 +151,11 @@ NzAbstractRenderQueue* NzForwardRenderTechnique::GetRenderQueue()
 	return &m_renderQueue;
 }
 
+nzRenderTechniqueType NzForwardRenderTechnique::GetType() const
+{
+	return nzRenderTechniqueType_BasicForward;
+}
+
 void NzForwardRenderTechnique::SetMaxLightsPerObject(unsigned int lightCount)
 {
 	#if NAZARA_GRAPHICS_SAFE
@@ -201,9 +208,9 @@ void NzForwardRenderTechnique::DrawOpaqueModels(const NzScene* scene)
 					program->SendVector(program->GetUniformLocation(nzShaderUniform_EyePosition), viewer->GetEyePosition());
 
 					// On envoie les lumières directionnelles s'il y a (Les mêmes pour tous)
-					lightCount = std::min(m_directionnalLights.GetLightCount(), 3U);
+					lightCount = std::min(m_directionalLights.GetLightCount(), 3U);
 					for (unsigned int i = 0; i < lightCount; ++i)
-						m_directionnalLights.GetLight(i)->Enable(program, i);
+						m_directionalLights.GetLight(i)->Enable(program, i);
 
 					lastProgram = program;
 				}
@@ -289,6 +296,7 @@ void NzForwardRenderTechnique::DrawOpaqueModels(const NzScene* scene)
 						}
 						else
 						{
+							unsigned int originalLightCount = lightCount;
 							for (const NzForwardRenderQueue::StaticData& data : staticData)
 							{
 								// Calcul des lumières les plus proches
@@ -306,6 +314,8 @@ void NzForwardRenderTechnique::DrawOpaqueModels(const NzScene* scene)
 
 								NzRenderer::SetMatrix(nzMatrixType_World, data.transformMatrix);
 								DrawFunc(primitiveMode, 0, indexCount);
+
+								lightCount = originalLightCount;
 							}
 						}
 						staticData.clear();
@@ -427,9 +437,9 @@ void NzForwardRenderTechnique::DrawTransparentModels(const NzScene* scene)
 			program->SendVector(program->GetUniformLocation(nzShaderUniform_EyePosition), viewer->GetEyePosition());
 
 			// On envoie les lumières directionnelles s'il y a (Les mêmes pour tous)
-			lightCount = std::min(m_directionnalLights.GetLightCount(), 3U);
+			lightCount = std::min(m_directionalLights.GetLightCount(), 3U);
 			for (unsigned int i = 0; i < lightCount; ++i)
-				m_directionnalLights.GetLight(i)->Enable(program, i);
+				m_directionalLights.GetLight(i)->Enable(program, i);
 
 			lastProgram = program;
 		}
